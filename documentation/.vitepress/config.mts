@@ -15,7 +15,7 @@ export default withMermaid(
     base,
     cleanUrls: true,
     publicDir: 'public',
-    srcExclude: ['**/AGENTS.md', '**/CLAUDE.md', 'node_modules/**'],
+    srcExclude: ['**/AGENTS.md', '**/CLAUDE.md', '**/_how-to-update.md', 'node_modules/**'],
     lastUpdated: true,
 
     head: [

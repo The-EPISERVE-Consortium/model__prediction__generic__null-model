@@ -20,12 +20,14 @@ renders the Markdown pages directly, including the Mermaid diagrams.
 
 The documentation is a committed snapshot, not generated from the code. If you
 change the model card, parameters, I/O, errors or architecture, update
-`documentation/` in the same pull request. Regenerate with
-`/skill:deep-wiki generate`, review the diff, then rebuild:
+`documentation/` in the same pull request and rebuild:
 
 ```bash
 cd documentation && npm run build
 ```
+
+See [`documentation/_how-to-update.md`](documentation/_how-to-update.md) for the
+full regeneration manual, verification steps and troubleshooting.
 
 ## Method
 
