@@ -23,6 +23,11 @@
 - [Configuration](documentation/01-getting-started/configuration.md): the four parameters and their bounds.
 - [Local Development](documentation/01-getting-started/local-development.md): run, test, build, publish.
 
+## Building a Model
+
+- [Build Your Own Model](documentation/03-template/build-your-own-model.md): keep the adapter, replace the core method.
+- [Agent brief](MODEL_TEMPLATE.md): file-by-file instructions and invariants for a coding agent.
+
 ## Deep Dive
 
 - [Execution Pipeline](documentation/02-architecture/execution-pipeline.md)

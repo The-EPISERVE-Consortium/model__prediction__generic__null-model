@@ -2,6 +2,14 @@
 
 Project context for coding agents working in this repository.
 
+## Using this repository as a template
+
+This repo doubles as the reference skeleton for new EPISERVE models. Keep the
+platform adapter (`run.py`, `config_schema.py`, `series.py`, Dockerfile, CI) and
+replace `src/model.py` with the new method. Read `MODEL_TEMPLATE.md` before
+changing the contract, and `documentation/03-template/build-your-own-model.md`
+for the human guide.
+
 ## Build & run
 
 ```bash

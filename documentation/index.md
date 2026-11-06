@@ -78,6 +78,7 @@ flowchart TD
 | Getting Started | What the model is, the container contract, config keys, local dev | [Overview](./01-getting-started/overview.md) |
 | Deep Dive | How the pipeline, axis handling, forecast and validation actually work | [Execution Pipeline](./02-architecture/execution-pipeline.md) |
 | Onboarding | Role-specific paths: contributor, staff engineer, executive, PM | [Contributor Guide](./onboarding/contributor-guide.md) |
+| Building a Model | How to reuse this repository for a new model | [Build Your Own Model](./03-template/build-your-own-model.md) |
 
 ### Getting Started
 
@@ -96,6 +97,12 @@ flowchart TD
 | [Time Axis and Target Handling](./02-architecture/series-handling.md) | Datetime/numeric/string axes, gap policy |
 | [The Null Forecast](./02-architecture/null-forecast.md) | Point statistic, quantiles, clamping |
 | [Model Card and Config Validation](./02-architecture/model-card-and-validation.md) | Card-driven JSON Schema validation |
+
+### Building a Model
+
+| Page | Description |
+|---|---|
+| [Build Your Own Model](./03-template/build-your-own-model.md) | Reuse this repo: keep the adapter, replace the core method |
 
 ### Onboarding
 

@@ -59,6 +59,18 @@
           "prompt": "Explain how fdo.json drives validation through jsonschema, how defaults are filled, and how the card is validated in CI. Cite fdo.json, src/config_schema.py:38-130 and .github/workflows/publish.yml:18-24."
         }
       ]
+    },
+    {
+      "title": "Building a Model",
+      "path": "03-template",
+      "description": "Use this repository as a template: keep the adapter, replace the core method.",
+      "children": [
+        {
+          "title": "Build Your Own Model",
+          "path": "03-template/build-your-own-model.md",
+          "prompt": "Explain what to keep and replace, the pure forecast contract, card changes, tests, publish and register. Cite src/model.py:49-114, fdo.json:31-67 and MODEL_TEMPLATE.md."
+        }
+      ]
     }
   ],
   "onboarding": [

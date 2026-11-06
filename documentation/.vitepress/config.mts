@@ -88,6 +88,13 @@ export default withMermaid(
             { text: 'Model Card & Validation', link: '/02-architecture/model-card-and-validation' },
           ],
         },
+        {
+          text: 'Building a Model',
+          collapsed: false,
+          items: [
+            { text: 'Build Your Own Model', link: '/03-template/build-your-own-model' },
+          ],
+        },
       ],
 
       outline: { level: [2, 3], label: 'On this page' },

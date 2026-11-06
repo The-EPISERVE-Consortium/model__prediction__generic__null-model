@@ -11,6 +11,24 @@ No training, no weights, no network access, no GPU.
 **In:** `input.parquet` + `config.json` under `/work/input/`.
 **Out:** `predictions.tsv` under `/work/output/`.
 
+## Using this as a template
+
+This repository is also the reference skeleton for a new EPISERVE model: the
+container contract, card-driven validation, axis handling, tests, CI and docs are
+already wired. To build a model with a real forecasting method, keep the adapter
+and replace the core:
+
+| Keep | Replace |
+|---|---|
+| `run.py`, `config_schema.py`, `series.py` | `src/model.py` — your method |
+| `Dockerfile`, CI, contract tests | `fdo.json` — parameters, I/O, resources |
+| `documentation/` structure | the pages describing the method |
+
+The core must stay a pure `forecast(x, y, prediction_length, **params)` that
+returns one row per step with a point and q10/q90. Read
+[Build Your Own Model](documentation/03-template/build-your-own-model.md) for the
+full guide, or [`MODEL_TEMPLATE.md`](MODEL_TEMPLATE.md) for the agent brief.
+
 ## Documentation
 
 Rendered documentation site: <https://the-episerve-consortium.github.io/model__prediction__generic__null-model/>
