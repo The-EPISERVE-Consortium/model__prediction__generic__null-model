@@ -6,9 +6,17 @@ on:
       - main
     tags:
       - "v*"
+    paths-ignore:
+      - 'documentation/**'
+      - '**/*.md'
+      - 'llms.txt'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'documentation/**'
+      - '**/*.md'
+      - 'llms.txt'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

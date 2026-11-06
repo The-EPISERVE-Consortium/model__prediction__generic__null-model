@@ -10,6 +10,7 @@ npm install          # first time
 npm run dev          # local dev server
 npm run build        # static build to .vitepress/dist
 npm run preview      # serve the build
+npm run check:mermaid          # parse every diagram
 python scripts/build_llms.py   # refresh llms-full.txt and public/llms*.txt
 ```
 
@@ -24,6 +25,7 @@ python scripts/build_llms.py   # refresh llms-full.txt and public/llms*.txt
 | `onboarding/` | contributor, staff, executive, PM guides |
 | `_how-to-update.md` | maintainer manual for regenerating the docs |
 | `scripts/build_llms.py` | regenerates `llms-full.txt` and the public LLM copies |
+| `scripts/check_mermaid.mjs` | parses every Mermaid block |
 | `catalogue.json` | machine-readable structure (sections + prompts) |
 | `llms.txt` | wiki-relative LLM index |
 | `llms-full.txt` | all pages inlined in `<doc>` blocks |

@@ -6,15 +6,21 @@ on:
     paths:
       - 'documentation/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'documentation/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -33,6 +39,16 @@ jobs:
         run: npm ci
         working-directory: documentation
 
+      - name: Check Mermaid diagrams
+        run: npm run check:mermaid
+        working-directory: documentation
+
+      - name: Check LLM indexes are current
+        run: |
+          python3 scripts/build_llms.py
+          git diff --exit-code -- llms-full.txt public/llms.txt public/llms-full.txt
+        working-directory: documentation
+
       - name: Build
         run: npm run build
         working-directory: documentation
@@ -40,15 +56,18 @@ jobs:
           # Project Pages live under /<repo>/; remove this for a custom domain.
           DOCS_BASE: /${{ github.event.repository.name }}/
 
-      - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: documentation/.vitepress/dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

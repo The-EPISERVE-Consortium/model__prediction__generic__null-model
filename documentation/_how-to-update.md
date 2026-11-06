@@ -62,6 +62,7 @@ Important:
 cd documentation
 npm ci
 npm run build
+npm run check:mermaid           # parses every diagram
 python scripts/build_llms.py    # regenerates llms-full.txt and the public copies
 ```
 
