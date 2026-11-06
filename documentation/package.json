@@ -1,0 +1,17 @@
+{
+  "name": "null-model-documentation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "debug": "^4.4.3",
+    "medium-zoom": "^1.1.0",
+    "mermaid": "^10.9.8",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}

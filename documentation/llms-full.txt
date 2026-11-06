@@ -1,0 +1,2369 @@
+# model__prediction__generic__null-model — full documentation
+
+> Complete inlined content of the documentation pages, for LLM context windows.
+
+<doc title="Contributor Guide" path="onboarding/contributor-guide.md">
+# Contributor Guide
+
+This guide assumes you can read Python and have used pandas at least once. It
+does not assume you know EPISERVE, forecasting, or this repository.
+
+## Prerequisites → new → deferred
+
+| You should already know | This guide introduces | Deliberately deferred |
+|---|---|---|
+| Python functions, type hints, exceptions | The `/work` container contract | Kubernetes Job internals |
+| pandas `Series`/`DataFrame` basics | JSON Schema validation | Prefect orchestration |
+| pytest basics | Direct vs recursive forecasting | lakeFS object layout |
+| git branches and PRs | The model card as a contract | Benchmark scoring formulas |
+
+## Part I — The domain in one page
+
+A **forecast model** on EPISERVE is a container. It receives a time series and a
+JSON config, and returns a table of future values. Nothing else crosses the
+boundary. This model's answer is deliberately boring: it computes one number from
+the recent past and repeats it
+([`src/model.py:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L1-L10)).
+
+```mermaid
+flowchart LR
+    subgraph Input
+        C["config.json"]
+        P["input.parquet"]
+    end
+    subgraph Container["python src/run.py"]
+        V["validate"] --> S["slice window"] --> F["forecast"]
+    end
+    subgraph Output
+        T["predictions.tsv"]
+    end
+    C --> V
+    P --> S
+    F --> T
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class C,P,V,S,F,T dark
+```
+
+<!-- Sources: src/run.py:47-148 -->
+
+Two ideas make the rest of the codebase legible:
+
+1. **The window is the model.** Everything before `forecast()` exists to turn
+   files into two clean `Series`; everything after exists to turn one number into
+   a TSV ([`src/run.py:121-145`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L121-L145)).
+2. **The card is the contract.** Parameter bounds are not in Python constants
+   first; they are in `fdo.json` and enforced through `jsonschema`
+   ([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
+
+## Part II — The four modules
+
+```mermaid
+classDiagram
+    class run {
+        +main() int
+        +_work_dir() Path
+        +_fail(msg) int
+    }
+    class config_schema {
+        +load_parameters() dict
+        +validate_config(config) tuple
+    }
+    class series {
+        +future_values(x, steps) tuple
+        +prepare_target(y) ndarray
+    }
+    class model {
+        +forecast(x, y, H, statistic) DataFrame
+    }
+    run --> config_schema
+    run --> model
+    model --> series
+```
+
+<!-- Sources: src/run.py:25-26, src/model.py:15, src/series.py, src/config_schema.py -->
+
+| Module | You touch it when… | Read first |
+|---|---|---|
+| `src/run.py` | changing I/O, error messages, window selection | [`run.py:47-148`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47-L148) |
+| `src/config_schema.py` | adding/renaming a parameter, changing validation text | [`config_schema.py:98-130`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L98-L130) |
+| `src/series.py` | supporting a new axis kind or gap policy | [`series.py:136-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L257) |
+| `src/model.py` | changing the forecast statistic or interval | [`model.py:27-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L116) |
+
+### Reading order
+
+```mermaid
+flowchart TD
+    A["README.md"] --> B["src/run.py"]
+    B --> C["src/config_schema.py"]
+    B --> D["src/model.py"]
+    D --> E["src/series.py"]
+    B --> F["tests/test_run.py"]
+    E --> G["tests/test_series.py"]
+    C --> H["tests/test_config_schema.py"]
+    D --> I["tests/test_model.py"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H,I dark
+```
+
+<!-- Sources: repository layout -->
+
+Start at `run.py` because it is the only place that knows the order of
+operations; every other module is called from there.
+
+## Part III — Getting productive
+
+### Setup
+
+```bash
+git clone https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model.git
+cd model__prediction__generic__null-model
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-test.txt
+pytest tests/ -v
+```
+
+You should see 83 passing tests in a few seconds.
+
+### Your first task: change a message
+
+A good first change is improving one error message in `_describe`
+([`src/config_schema.py:71-95`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L71-L95)).
+The loop is:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant You
+    participant Test as tests/test_config_schema.py
+    participant Code as src/config_schema.py
+
+    You->>Test: run the failing/expected case
+    Test-->>You: red
+    You->>Code: change _describe
+    You->>Test: pytest
+    Test-->>You: green
+    You->>You: commit + push + PR
+```
+
+<!-- Sources: tests/test_config_schema.py:96-135, src/config_schema.py:71-95 -->
+
+### Adding a parameter (the full checklist)
+
+This is the most common non-trivial change, and it touches five places:
+
+| Step | File | Why |
+|---|---|---|
+| 1. Declare it | `fdo.json` → `episerve:parameters.properties` | The card is the source of truth |
+| 2. Give it a default/bounds | same block | Validation and API prefill |
+| 3. Read it | `src/run.py:84-87` | Pass it to the model |
+| 4. Implement it | `src/model.py` or `src/series.py` | Behaviour |
+| 5. Test it | `tests/test_*.py` | Lock the contract |
+
+```mermaid
+flowchart LR
+    A["fdo.json"] --> B["config_schema<br>validates"]
+    B --> C["run.py<br>resolves"]
+    C --> D["model/series<br>uses"]
+    D --> E["tests<br>assert"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E dark
+```
+
+<!-- Sources: fdo.json:31-67, src/run.py:84-87, tests/test_config_schema.py:22-60 -->
+
+`tests/test_config_schema.py:22-60` is the guard that keeps the card and the
+Python constants in sync; if you add a bound, add it there too.
+
+### Testing strategy
+
+| Layer | File | Style |
+|---|---|---|
+| Pure functions | `test_series.py`, `test_model.py` | construct a Series, assert output |
+| Card/validator | `test_config_schema.py` | parameterised bad configs |
+| CLI end-to-end | `test_run.py` | temp `WORK_DIR`, call `main()`, read TSV |
+
+Run one test while iterating:
+
+```bash
+pytest tests/test_model.py::test_quantiles_are_empirical_quantiles_of_the_window -v
+```
+
+### Debugging
+
+| Symptom | First check |
+|---|---|
+| `config.json not found` | `WORK_DIR` and `_work_dir()` |
+| `x values must have a uniform step` | print `x.diff().value_counts()` |
+| `history must contain at least 3 points` | window slice indices |
+| Output columns wrong | input column order (time first, target second) |
+
+## Glossary
+
+| Term | Meaning here |
+|---|---|
+| **Window** | The `history_length` rows whose statistic is repeated |
+| **Offset** | Rows skipped at the end, for back-testing |
+| **Direct forecast** | Compute once, repeat; no feedback of predictions |
+| **Recursive forecast** | Feed each prediction back into the window (not implemented) |
+| **Null model** | A baseline with no trend/seasonality/covariates |
+| **Model card** | `fdo.json`, the machine-readable contract |
+| **`episerve:parameters`** | The JSON Schema inside the card |
+
+## Contribution workflow
+
+1. Branch from `main`.
+2. Make the smallest change that satisfies the card.
+3. `pytest tests/ -v` — all green.
+4. `episerve-validate fdo.json` if the card changed.
+5. Open a PR; CI runs the card check and the in-image tests.
+6. Merge; `main` publishes `:latest` automatically.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Branch
+    Branch --> Edit
+    Edit --> Test
+    Test --> Edit: red
+    Test --> PR: green
+    PR --> CI
+    CI --> Edit: red
+    CI --> Merge: green
+    Merge --> Publish
+    Publish --> [*]
+```
+
+<!-- Sources: .github/workflows/publish.yml:17-83 -->
+
+## Key files
+
+| File | Lines | Read it for |
+|---|---|---|
+| `src/run.py` | 152 | orchestration and error contract |
+| `src/series.py` | 257 | axis and gap edge cases |
+| `src/model.py` | 116 | forecast arithmetic |
+| `src/config_schema.py` | 130 | validation and messages |
+| `fdo.json` | 128 | the contract |
+| `tests/test_run.py` | 232 | end-to-end expectations |
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Execution Pipeline](../02-architecture/execution-pipeline.md) | The detailed trace |
+| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic |
+| [Local Development](../01-getting-started/local-development.md) | Commands |
+| [Staff Engineer Guide](./staff-engineer-guide.md) | When you need the "why" |
+
+## References
+
+- [`README.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md)
+- [`src/`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/tree/main/src)
+- [`tests/`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/tree/main/tests)
+</doc>
+
+<doc title="Staff Engineer Guide" path="onboarding/staff-engineer-guide.md">
+# Staff Engineer Guide
+
+## The one insight
+
+**The model is not the code; the window is the model.** Everything else is a
+plumbing decision about how to obtain a clean window and how to serialize one
+number. Once you accept that, the absence of a framework, a model registry or a
+dependency-injection layer is not an omission — it is the design
+([`src/model.py:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L1-L10)).
+
+The corollary is that the risk surface is not in the forecast; it is in the
+boundary. Axis inference, gap policy, config validation and the error contract
+are where runs fail and where platform compatibility is won or lost
+([`src/series.py:136-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L257)).
+
+## System shape
+
+```mermaid
+flowchart TD
+    subgraph Boundary["Container boundary"]
+        direction LR
+        IN["config + parquet"] --> RUN["run.main"]
+        RUN --> OUT["predictions.tsv"]
+    end
+    subgraph Core["Pure core"]
+        direction LR
+        CS["config_schema"] --> MD["model"]
+        SR["series"] --> MD
+    end
+    RUN --> CS
+    RUN --> MD
+    MD --> SR
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class IN,RUN,OUT,CS,MD,SR dark
+```
+
+<!-- Sources: src/run.py:25-26, src/model.py:15 -->
+
+The core is pure: `forecast(x, y, H, statistic)` has no I/O, no globals and no
+clock. That is what makes the 83-test suite fast and deterministic
+([`src/model.py:49-55`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49-L55)).
+
+## Decision log
+
+| # | Decision | Alternative rejected | Why |
+|---|---|---|---|
+| 1 | Flat direct forecast | Recursive sliding window | Recursion only damps the last difference; worse on the benchmark |
+| 2 | Empirical q10/q90 | Parametric normal interval | No distributional assumption; honest for skewed windows |
+| 3 | Clamp point into interval | Report incoherent interval | A point outside its own interval is unusable for scoring |
+| 4 | Card-driven JSON Schema | Python constants + docs | One source of truth for API, CLI and tests |
+| 5 | `ERROR:` line, exit 1 | Traceback | Runner must parse failures without Python knowledge |
+| 6 | First two columns only | Named target lookup | Works on covariate benchmark inputs without SQL |
+| 7 | String axis → row positions | Reject string axes | ISO-week datasets are common; positions are unambiguous |
+| 8 | Gap ≤8 interpolate, else reject | Impute everything | Long gaps are not the same series; fabricating them is dishonest |
+
+Sources: [`src/model.py:27-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L116),
+[`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25),
+[`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68),
+[`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138).
+
+## Pseudocode (TypeScript)
+
+The Python is short enough to transliterate, which is a useful test of whether
+the design is actually simple:
+
+```ts
+function forecast(x: Series, y: Series, h: number, stat: Stat): Row[] {
+  assert(h > 0 && h <= 512);
+  assert(x.length >= 3);
+  const w = prepareTarget(y);                 // fill <=8-row gaps, else throw
+  const point = stat === "mean"   ? mean(w)
+              : stat === "median" ? median(w)
+              :                     w[w.length - 1];
+  let [q10, q90] = quantile(w, [0.1, 0.9]);
+  q10 = Math.min(q10, point);
+  q90 = Math.max(q90, point);
+  const future = futureValues(x, h);          // calendar offset or step
+  return future.map((xv, i) => ({
+    [x.name]: xv,
+    ...(future.positional ? { x_auto_converted: xv + offset } : {}),
+    [y.name]: point,
+    [`${y.name}_q10`]: q10,
+    [`${y.name}_q90`]: q90,
+  }));
+}
+```
+
+Compare [`src/model.py:89-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L89-L114).
+The only non-obvious line is the clamp; everything else is data shaping.
+
+## Failure modes
+
+```mermaid
+stateDiagram-v2
+    [*] --> BadConfig
+    BadConfig --> Rejected: schema error
+    [*] --> BadAxis
+    BadAxis --> Rejected: NaN/duplicate/non-uniform
+    [*] --> BadTarget
+    BadTarget --> Rejected: non-numeric / long gap
+    [*] --> BadWindow
+    BadWindow --> Rejected: history+offset > rows
+    [*] --> Ok
+    Ok --> Written
+    Rejected --> [*]: exit 1, ERROR line
+    Written --> [*]: exit 0
+```
+
+<!-- Sources: src/run.py:65-146, src/series.py:136-257 -->
+
+| Failure | Blast radius | Detection |
+|---|---|---|
+| Axis drift (DST, month length) | Wrong future x values | `infer_freq` + tests |
+| Long interior gap | Fabricated history | length check before interpolation |
+| Point outside interval | Incoherent scoring | clamp |
+| Unknown config key | Silent default misuse | `additionalProperties: false` |
+| Huge horizon | Memory/time blow-up | 512-step cap |
+| Parquet schema change | Wrong column roles | first-two-columns rule |
+
+## Performance
+
+```mermaid
+flowchart LR
+    A["read parquet<br>O(rows)"] --> B["slice window<br>O(k)"]
+    B --> C["mean/quantile<br>O(k log k)"]
+    C --> D["write H rows<br>O(H)"]
+    D --> E["total ≈ O(rows)"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E dark
+```
+
+<!-- Sources: src/run.py:104-145, src/model.py:89-114 -->
+
+The dominant cost is reading the parquet file; the forecast itself is
+microseconds. The declared 250m CPU / 256Mi / 5s is therefore a pipeline
+statement, not a compute statement
+([`fdo.json:111-117`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L111-L117)).
+This is why the model is a good canary: if it takes longer than a few seconds,
+the problem is the platform, not the model.
+
+## Tradeoffs
+
+| Choice | Gain | Cost |
+|---|---|---|
+| First two columns only | Works with any benchmark schema | Cannot use named covariates |
+| Card as schema | One contract, no drift | Card edits need care |
+| No pinned deps | Simple requirements | Reproducibility risk (acknowledged in README) |
+| No recursive mode | Simpler, better on benchmark | Cannot express momentum |
+| String → positions | Handles ISO weeks | Output labels are not real dates |
+
+## When to extend
+
+```mermaid
+flowchart TD
+    A["new requirement"] --> B{"Changes the null hypothesis?"}
+    B -- no --> C["fix plumbing<br>(axis, gaps, errors)"]
+    B -- yes --> D{"Can it be a new statistic?"}
+    D -- yes --> E["add enum + branch + tests"]
+    D -- no --> F["new model repo,<br>not this one"]
+    C --> G["patch release"]
+    E --> G
+    F --> H["new card + image"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H dark
+```
+
+<!-- Sources: fdo.json:31-67, README.md:129-138 -->
+
+The boundary is deliberate: `statistic` is an enum, not a plugin point. A drift
+model or a seasonal-naive model changes the hypothesis and belongs in its own
+repository with its own card, not behind a flag here.
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic and the clamp |
+| [Model Card and Config Validation](../02-architecture/model-card-and-validation.md) | The contract mechanism |
+| [Executive Guide](./executive-guide.md) | The same tradeoffs without code |
+
+## References
+
+- [`src/model.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py)
+- [`src/series.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py)
+- [`fdo.json`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json)
+</doc>
+
+<doc title="Executive Guide" path="onboarding/executive-guide.md">
+# Executive Guide
+
+## What it is, in one paragraph
+
+The null model is a deliberately simple forecasting baseline. It looks at a
+recent window of data, computes one summary number — the average, the median, or
+the latest value — and predicts that the future will stay at that level. It also
+reports a plausible range around that number. It trains nothing, downloads
+nothing, and runs in about five seconds on a quarter of a CPU
+([`fdo.json:111-117`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L111-L117)).
+
+Its value is not accuracy. Its value is **comparability**: it gives every
+benchmark a defensible floor, so a leaderboard can say "this model beats doing
+nothing" rather than only "this model beats the other model".
+
+## Capability map
+
+```mermaid
+flowchart LR
+    subgraph Capabilities
+        B["Baseline scoring"]
+        C["Pipeline canary"]
+        D["Dataset-agnostic runs"]
+        E["Probabilistic output"]
+    end
+    B --> LB["Trustworthy leaderboards"]
+    C --> REL["Faster platform incident detection"]
+    D --> COV["More datasets benchmarkable"]
+    E --> SC["Coverage and interval metrics"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class B,C,D,E,LB,REL,COV,SC dark
+```
+
+<!-- Sources: fdo.json:18-29, README.md:1-12 -->
+
+| Capability | Business effect |
+|---|---|
+| Baseline scoring | Leaderboard claims become falsifiable |
+| Pipeline canary | Platform regressions surface in minutes, not days |
+| Dataset-agnostic | No per-dataset engineering to add a benchmark |
+| Probabilistic output | Enables interval score and coverage, not just MAE |
+
+## Cost and scaling
+
+```mermaid
+flowchart TD
+    A["per run"] --> B["250m CPU"]
+    A --> C["256Mi memory"]
+    A --> D["~5 s"]
+    A --> E["no GPU, no network"]
+    B --> F["~1/8 of a core"]
+    C --> G["fits on any node"]
+    D --> H["negligible cluster time"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H dark
+```
+
+<!-- Sources: fdo.json:111-117 -->
+
+The cost model is linear in the number of runs and effectively zero per run.
+The dominant cost is orchestration overhead (scheduling a Kubernetes Job), not
+compute. At platform scale the model is cheaper than the metadata written about
+it.
+
+## Risk assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Baseline mistaken for a real forecaster | Medium | Medium | Card says "performance floor"; docs repeat it |
+| Window tuning overfits a benchmark | High | Medium | Publish parameter choices; compare across benchmarks |
+| Dependency drift breaks reproducibility | Medium | Low | Pin versions in a future release |
+| Long gaps silently imputed | Low | High | Gaps >8 rows are rejected, not filled |
+| String axes produce non-date labels | Medium | Low | `x_auto_converted` makes the convention explicit |
+| Leaderboard dominated by tuned baselines | Medium | Medium | Report ranks by multiple metrics; document tuning |
+
+Sources: [`fdo.json:119-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L119-L127),
+[`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25),
+[`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138).
+
+The overfitting risk is real and worth stating plainly: on the AMELAG benchmark,
+changing the window from 8 to 34 weeks moved the interval-score rank from last
+to ninth. That is a property of the test window, not evidence that a 34-week mean
+is universally better. The baseline should be re-evaluated per benchmark, and the
+chosen parameters should be recorded with the entry.
+
+## Investment thesis
+
+```mermaid
+flowchart LR
+    I["Small, one-off engineering effort"] --> A["Credible leaderboards"]
+    I --> B["Cheap pipeline canary"]
+    I --> C["Reusable across datasets"]
+    A --> V["Platform trust"]
+    B --> V
+    C --> V
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class I,A,B,C,V dark
+```
+
+<!-- Sources: README.md:1-12, fdo.json:18-29 -->
+
+The effort is already sunk and the maintenance surface is four small Python
+files plus one JSON card. The return is a permanent, auditable floor for every
+forecast benchmark and a canary that exercises the full model-runner path. The
+alternative — no baseline — makes every leaderboard claim weaker for zero
+savings.
+
+## Recommendations
+
+1. **Keep it deployed and registered.** It is the cheapest trust mechanism the
+   platform has.
+2. **Label it as a baseline in the catalog.** The card already does; make sure
+   the UI does too.
+3. **Record the chosen window per benchmark entry.** Avoid presenting a tuned
+   baseline as a neutral default.
+4. **Pin dependencies before the next release.** The only acknowledged
+   reproducibility gap.
+5. **Do not extend it into a real forecaster.** New hypotheses belong in new
+   model repositories; this one should stay a floor.
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Product Manager Guide](./product-manager-guide.md) | The same story for non-engineering stakeholders |
+| [Staff Engineer Guide](./staff-engineer-guide.md) | The technical tradeoffs behind these risks |
+| [Overview](../01-getting-started/overview.md) | The model in plain terms |
+
+## References
+
+- [`fdo.json`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json)
+- [`README.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md)
+</doc>
+
+<doc title="Product Manager Guide" path="onboarding/product-manager-guide.md">
+# Product Manager Guide
+
+## What users get
+
+The null model answers a simple question: **"If we assumed nothing changes, what
+would the forecast look like?"** It looks at the recent history of a dataset,
+picks one representative number — the average, the middle value, or the latest
+value — and predicts that the future stays there. It also gives a range that
+reflects how much the recent history moved around
+([`README.md:14-26`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L14-L26)).
+
+That is intentionally unambitious. Its job is to be the **benchmark floor**: the
+number every real model must beat before its result means anything.
+
+## Who uses it, and why
+
+```mermaid
+flowchart LR
+    R["Researcher"] --> Q["Is my model better than<br>doing nothing?"]
+    P["Platform engineer"] --> C["Does the pipeline<br>still work end to end?"]
+    L["Benchmark owner"] --> F["Is this leaderboard<br>credible?"]
+    Q --> M["Null model"]
+    C --> M
+    F --> M
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class R,P,L,Q,C,F,M dark
+```
+
+<!-- Sources: README.md:1-12, fdo.json:119-127 -->
+
+| User | Job to be done | What they get |
+|---|---|---|
+| Researcher | Compare a new model against a fair floor | A baseline entry on the leaderboard |
+| Platform engineer | Verify the model pipeline after a change | A five-second end-to-end run |
+| Benchmark owner | Make leaderboard claims defensible | A permanent reference point |
+| Data curator | Add a dataset without custom code | A model that runs on any two-column series |
+
+## The user journey
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant A as API / CLI
+    participant P as Platform
+    participant B as Benchmark
+
+    U->>A: choose dataset + horizon
+    A->>P: start null-model run
+    P-->>A: run finished, predictions stored
+    U->>B: add run as benchmark entry
+    B-->>U: rank, error, coverage, interval score
+```
+
+<!-- Sources: README.md:120-127, fdo.json:18-29 -->
+
+The user never edits code. They choose a dataset and a horizon; the platform
+fills in the history window and runs the container.
+
+## Capability map
+
+```mermaid
+flowchart TD
+    A["Null model"] --> B["Point forecast<br>one repeated value"]
+    A --> C["Range forecast<br>10th to 90th percentile"]
+    A --> D["Any time series<br>dates, numbers or labels"]
+    A --> E["Any dataset<br>first two columns used"]
+    B --> F["MAE / RMSE"]
+    C --> G["Coverage / interval score"]
+    D --> H["No per-dataset setup"]
+    E --> H
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H dark
+```
+
+<!-- Sources: fdo.json:18-29, fdo.json:69-108 -->
+
+| Capability | Available | Notes |
+|---|---|---|
+| Predict a future level | Yes | One number, repeated |
+| Give a range | Yes | Based on recent variation |
+| Use extra data (weather, mobility) | No | Extra columns are ignored |
+| Follow a trend or season | No | That is a different model |
+| Run on a new dataset | Yes | Time column first, target second |
+| Run without internet | Yes | No downloads, no weights |
+
+## Known limitations
+
+| Limitation | What it means for a user |
+|---|---|
+| The forecast is flat | It will not follow a rising or falling wave |
+| The range is historical spread | It is not a guarantee of future uncertainty |
+| One series per run | No multi-region or multi-age-group forecasts in one call |
+| Long gaps are rejected | A dataset with more than 8 missing rows in a row cannot run |
+| String dates become positions | The output shows row numbers, not new labels |
+| Window choice matters | A different history length can change the result a lot |
+
+Sources: [`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138),
+[`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25).
+
+The last one deserves emphasis: on one real benchmark, changing the history from
+8 to 34 weeks moved the model from last place to ninth place on interval score.
+The baseline is sensitive to that choice, so the chosen window should be shown
+next to any result.
+
+## Data and privacy
+
+| Question | Answer |
+|---|---|
+| Does it store data? | No; it reads the input file and writes the output file |
+| Does it send data anywhere? | No; network access is disabled |
+| Does it train on data? | No; there are no parameters or weights |
+| Does it need credentials? | No |
+| What does it keep? | Nothing after the run; the platform stores the output |
+
+Source: [`fdo.json:111-117`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L111-L117),
+[`fdo.json:123`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L123).
+
+## FAQ
+
+**Is this a real forecast?**
+It is a real forecast of a deliberately simple hypothesis: "the future looks like
+the recent average". It is not expected to be accurate; it is expected to be a
+fair floor.
+
+**Why is every predicted value the same?**
+Because the model computes one number and repeats it. That is the definition of
+this baseline, not a bug ([`README.md:14-26`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L14-L26)).
+
+**Can it use weather or mobility data?**
+No. It reads only the time column and the target column. A model that uses
+covariates is a different model.
+
+**Why does the range look so wide?**
+It is the spread of the recent history. A window that contains a big wave
+produces a wide range.
+
+**What happens if the data has gaps?**
+Short gaps (up to 8 rows) are filled; longer gaps stop the run with a clear
+message ([`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25)).
+
+**How long does a run take?**
+About five seconds, with no GPU and no network
+([`fdo.json:116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L116)).
+
+**Can we change the history length?**
+Yes, it is a run parameter. The platform can prefill it from the benchmark, and
+the chosen value should be recorded with the result.
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Executive Guide](./executive-guide.md) | Cost, risk and investment view |
+| [Overview](../01-getting-started/overview.md) | The model in technical terms |
+| [Configuration](../01-getting-started/configuration.md) | The parameters a user can set |
+
+## References
+
+- [`README.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md)
+- [`fdo.json`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json)
+</doc>
+
+<doc title="Overview" path="01-getting-started/overview.md">
+# Overview
+
+## Why this model exists
+
+Every forecast benchmark needs a floor. Without one, a leaderboard cannot answer
+the first question a reader asks: *is this model actually better than doing
+nothing?* The null model is that floor. It assumes the future looks like one
+summary statistic of the recent past and nothing else — no trend, no seasonality,
+no covariates ([`src/model.py:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L1-L10)).
+
+It has a second job: because it is tiny and deterministic, it is the cheapest
+possible end-to-end test of the model-runner pipeline. If a platform change
+breaks image pull, config parsing, parquet reading or TSV output, this model
+fails first and loudly ([`fdo.json:121`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L121)).
+
+| Question | Answer | Source |
+|---|---|---|
+| What does it predict? | One statistic of the trailing window, repeated for every step | [`src/model.py:90`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L90) |
+| Is the forecast flat? | Yes, by design: point and interval are identical in every row | [`src/model.py:106-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L106-L114) |
+| Does it emit uncertainty? | Yes: empirical q10/q90 of the same window | [`src/model.py:92`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L92) |
+| Does it train or download? | No: zero parameters, no network | [`fdo.json:111-117`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L111-L117) |
+| What does it cost? | 250m CPU, 256Mi memory, ~5 s | [`fdo.json:112-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L112-L116) |
+
+## Where it sits
+
+```mermaid
+flowchart LR
+    subgraph Platform["EPISERVE platform"]
+        API["API server"] --> PF["Prefect model-runner"]
+        PF --> K8S["Kubernetes Job"]
+        K8S --> IMG["null-model image"]
+        IMG --> LF["lakeFS model-runs"]
+        LF --> CKAN["CKAN catalog"]
+        CKAN --> LB["Benchmark leaderboard"]
+    end
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class API,PF,K8S,IMG,LF,CKAN,LB dark
+```
+
+<!-- Sources: fdo.json:8-16, .github/workflows/publish.yml:15, README.md:120-127 -->
+
+The model itself only knows about `/work/input` and `/work/output`. Everything
+else — pulling the input, pushing the predictions, registering the run — is the
+runner's job ([`src/run.py:1-12`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L1-L12)).
+
+## What "null" means here
+
+```mermaid
+flowchart TD
+    S["Observed window<br>y[n-k .. n-1]"] --> P["point = mean / median / last"]
+    S --> Q["q10, q90 = empirical quantiles"]
+    P --> C{"point inside [q10, q90]?"}
+    Q --> C
+    C -- no --> W["widen interval to include point"]
+    C -- yes --> K["keep interval"]
+    W --> R["repeat for h = 1..H"]
+    K --> R
+    R --> O["flat forecast"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class S,P,Q,C,W,K,R,O dark
+```
+
+<!-- Sources: src/model.py:89-97, src/model.py:106-114 -->
+
+Three consequences follow directly from that definition:
+
+1. **The output is constant.** If the window mean is 14,029.19, every forecast
+   row is 14,029.19. Only the time axis advances
+   ([`src/model.py:106-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L106-L114)).
+2. **The interval is a spread, not a predictive distribution.** q10/q90 describe
+   how variable the window was, not how uncertain the future is
+   ([`src/model.py:7-9`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L7-L9)).
+3. **It is a direct multi-step forecast.** Forecasts are never fed back into the
+   window; a recursive (sliding-window) variant is deliberately not implemented
+   ([`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138)).
+
+## The forecast horizon
+
+```mermaid
+flowchart LR
+    subgraph Observed["Observed history (k rows)"]
+        direction LR
+        H1["y[n-k]"] --> H2["..."] --> H3["y[n-1]"]
+    end
+    subgraph Horizon["Forecast (H rows)"]
+        direction LR
+        F1["h=1<br>point"] --> F2["h=2<br>point"] --> F3["..."] --> F4["h=H<br>point"]
+    end
+    H3 --> F1
+```
+
+<!-- Sources: src/model.py:99-114 -->
+
+The history is consumed once; the horizon is generated from it. Nothing in the
+horizon feeds back into the history, which is what makes the line flat.
+
+## Choosing the statistic
+
+| Statistic | Forecast level | Best when | Weakness |
+|---|---|---|---|
+| `mean` | Average of the window | The window is stationary and not spiked | A single old spike drags the level up |
+| `median` | Middle value | The window contains outbreaks or outliers | Ignores a genuine level shift |
+| `last` | Final observation | Pure persistence is the right null | Ignores everything before the last point |
+
+Source: [`src/model.py:27-46`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L46),
+[`fdo.json:56-61`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L56-L61).
+
+On the AMELAG SARS-CoV-2 benchmark, the choice is dramatic: a 34-week `mean`
+gives MAE 8,866 and full interval coverage, while a 50-week `median` gives the
+same MAE but an interval score 4× worse, because the median level (15,641) sits
+far below the mean-dominated interval. The statistic and the window length are
+therefore tuned together, not independently.
+
+## Non-goals
+
+- Not a competitor to real forecasters; it should lose to them.
+- Not a seasonal-naive or drift model — both would add trend/seasonality
+  assumptions that the null hypothesis explicitly rejects.
+- Not a recursive one-step-ahead forecaster (see
+  [The Null Forecast](./../02-architecture/null-forecast.md)).
+- Not a data-quality gate: it fills short gaps and rejects long ones, but it
+  does not validate semantics ([`src/series.py:221-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L221-L257)).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Container Contract](./container-contract.md) | The exact `/work` files and exit codes |
+| [Configuration](./configuration.md) | How `history_length` and `statistic` change the level |
+| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic behind the flat line |
+| [Execution Pipeline](../02-architecture/execution-pipeline.md) | How a run moves from config to TSV |
+
+## References
+
+- [`README.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md)
+- [`fdo.json`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json)
+- [`src/model.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py)
+</doc>
+
+<doc title="Container Contract" path="01-getting-started/container-contract.md">
+# Container Contract
+
+## Why a contract instead of an API
+
+The model-runner does not import this code. It starts a Kubernetes Job with a
+shared `emptyDir` mounted at `/work`, puts two files in `/work/input`, and reads
+one file from `/work/output` after the container exits
+([`src/run.py:1-12`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L1-L12)).
+That boundary is what lets the platform run Python, R or a compiled binary
+without changing the runner. The price is that **everything the model needs must
+be in those two input files**, and **everything the platform needs must be in
+that one output file**.
+
+| Path | Direction | Format | Required |
+|---|---|---|---|
+| `/work/input/config.json` | in | JSON object | yes |
+| `/work/input/input.parquet` | in | Apache Parquet, ≥2 columns | yes, except `--check-config` |
+| `/work/output/predictions.tsv` | out | TSV, one row per step | yes on success |
+
+Source: [`src/run.py:61-67`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L61-L67),
+[`src/run.py:100-104`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L100-L104),
+[`src/run.py:143-145`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L143-L145).
+
+## The run, as a sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant R as model-runner
+    participant C as container
+    participant FS as /work
+
+    R->>FS: write input/config.json + input.parquet
+    R->>C: start image with entrypoint python src/run.py
+    C->>FS: read config.json
+    C->>C: validate against fdo.json
+    alt config invalid
+        C-->>R: exit 1 + ERROR lines on stderr
+    else config valid
+        C->>FS: read input.parquet
+        C->>C: slice window, prepare target, forecast
+        C->>FS: write output/predictions.tsv
+        C-->>R: exit 0
+    end
+    R->>FS: upload predictions.tsv to lakeFS
+```
+
+<!-- Sources: src/run.py:47-148, src/run.py:143-145 -->
+
+## Input details
+
+### `config.json`
+
+A flat JSON object. Unknown keys are **errors**, not warnings, because the card
+sets `additionalProperties: false`
+([`fdo.json:31-35`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L35)).
+The schema, bounds and defaults are documented in
+[Configuration](./configuration.md).
+
+### `input.parquet`
+
+The model reads the file with pandas and uses **the first two columns only**
+([`src/run.py:104-111`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L104-L111)):
+
+| Position | Role | Accepted types | Notes |
+|---|---|---|---|
+| 0 | time axis | date, datetime, isoWeek, integer, number, string | unique, increasing, uniform step |
+| 1 | target | number, nullable | gaps ≤8 interpolated, longer rejected |
+| 2+ | ignored | any | covariates are not used |
+
+The column names are free. The output reuses the input names, so a benchmark
+target called `viruslast_normalisiert` produces `viruslast_normalisiert`,
+`viruslast_normalisiert_q10`, `viruslast_normalisiert_q90`
+([`src/model.py:103-113`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L103-L113)).
+
+## Output details
+
+`predictions.tsv` is tab-separated with a header row. For a datetime axis:
+
+```text
+datum	viruslast_normalisiert	viruslast_normalisiert_q10	viruslast_normalisiert_q90
+2026-08-19	14029.1917	1468.8	39224.8
+2026-08-26	14029.1917	1468.8	39224.8
+...
+```
+
+For a string axis an extra `x_auto_converted` column carries the 1-indexed row
+position, because the model cannot invent new labels
+([`src/model.py:99-110`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L99-L110)).
+
+```mermaid
+flowchart LR
+    A["input columns<br>datum, target, cov1"] --> B["window.iloc[:, 0:2]"]
+    B --> C["forecast frame"]
+    C --> D["datum, target, target_q10, target_q90"]
+    C -. string axis .-> E["datum, x_auto_converted, target, q10, q90"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E dark
+```
+
+<!-- Sources: src/run.py:123-125, src/model.py:99-114 -->
+
+## Exit codes and error format
+
+| Code | Meaning | What the runner sees |
+|---|---|---|
+| 0 | success, `predictions.tsv` written | run continues |
+| 1 | any handled failure | stderr line(s) beginning `ERROR:` |
+
+Every handled failure goes through `_fail`, which prints exactly one
+`ERROR: <message>` line and returns 1
+([`src/run.py:29-32`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L29-L32)).
+Config validation may print several lines, one per problem, before returning
+([`src/run.py:79-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L79-L82)).
+
+```mermaid
+stateDiagram-v2
+    [*] --> ConfigMissing
+    ConfigMissing --> Fail: config.json absent
+    [*] --> Parse
+    Parse --> Fail: invalid JSON
+    Parse --> Validate
+    Validate --> Fail: schema errors
+    Validate --> CheckConfig: --check-config
+    CheckConfig --> [*]: exit 0
+    Validate --> ReadData
+    ReadData --> Fail: parquet absent / <2 columns
+    ReadData --> Window
+    Window --> Fail: history_length + offset > rows
+    Window --> Forecast
+    Forecast --> Fail: ValueError (axis, gap, horizon)
+    Forecast --> Write
+    Write --> [*]: exit 0
+```
+
+<!-- Sources: src/run.py:65-146 -->
+
+The `except Exception` at [`src/run.py:140-141`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L140-L141)
+converts unexpected library errors into the same `ERROR:` format, so the runner
+never has to parse a Python traceback.
+
+## `--check-config` fast path
+
+`python src/run.py --check-config` validates `config.json` against the card and
+exits **before reading any data or importing the forecast code**
+([`src/run.py:96-98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L96-L98)).
+It prints `config.json OK` and returns 0, or the usual `ERROR:` lines and 1.
+
+```bash
+docker run --rm -v $(pwd)/work/input:/work/input \
+  ghcr.io/the-episerve-consortium/model__prediction__generic__null-model:latest \
+  --check-config
+```
+
+This is the cheapest way for the API server to reject a bad config before
+scheduling a Job.
+
+## Work-directory resolution
+
+```mermaid
+flowchart TD
+    A["start"] --> B{"WORK_DIR set?"}
+    B -- yes --> C["use $WORK_DIR"]
+    B -- no --> D{"./work exists?"}
+    D -- yes --> E["use ./work"]
+    D -- no --> F["use /work"]
+    C --> G["input/ + output/"]
+    E --> G
+    F --> G
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G dark
+```
+
+<!-- Sources: src/run.py:35-44 -->
+
+In the container there is no `./work`, so the fallback is `/work`. Locally,
+`WORK_DIR=./work` makes the same code run without root or a mount
+([`src/run.py:41-44`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L41-L44)).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Configuration](./configuration.md) | The keys validated before any data is read |
+| [Local Development](./local-development.md) | Reproducing the contract without Kubernetes |
+| [Execution Pipeline](../02-architecture/execution-pipeline.md) | What happens between the files |
+
+## References
+
+- [`src/run.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py)
+- [`fdo.json:69-108`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L69-L108) — input/output declarations
+- [`Dockerfile`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/Dockerfile)
+</doc>
+
+<doc title="Configuration" path="01-getting-started/configuration.md">
+# Configuration
+
+## Why the config is this small
+
+The model has no hyperparameters to tune beyond the ones that define the
+forecast question itself: *how much history*, *how far ahead*, *which statistic*.
+Everything else is fixed by the null hypothesis. The card declares exactly four
+keys, and `config_schema.py` refuses anything else
+([`fdo.json:31-67`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L67)).
+
+| Key | Required | Type | Bounds | Default | Meaning |
+|---|---|---|---|---|---|
+| `history_length` | yes | integer | ≥ 3 | — | Rows in the window whose statistic is repeated |
+| `prediction_length` | yes | integer | 1–512 | — | Steps to forecast |
+| `prediction_offset` | no | integer | ≥ 0 | 0 | Rows skipped at the end (back-testing) |
+| `statistic` | no | string | `mean`, `median`, `last` | `mean` | Which window statistic to repeat |
+
+Source: [`fdo.json:35-61`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L35-L61).
+
+## The window equation
+
+The window is the slice `[len(data) - offset - history_length, len(data) - offset)`
+([`src/run.py:121-125`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L121-L125)):
+
+```mermaid
+flowchart LR
+    subgraph Data["input.parquet rows"]
+        direction LR
+        H["history window<br>history_length rows"] --> O["offset<br>prediction_offset rows"]
+        O --> E["end of file"]
+    end
+    H --> P["point + q10/q90"]
+    P --> F["forecast<br>prediction_length rows"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class H,O,E,P,F dark
+```
+
+<!-- Sources: src/run.py:113-125, fdo.json:40 -->
+
+Two constraints follow:
+
+1. `history_length + prediction_offset ≤ len(input.parquet)`, otherwise the run
+   fails with an `ERROR:` naming both numbers
+   ([`src/run.py:113-119`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L113-L119)).
+2. `history_length ≥ 3`: with fewer points the empirical q10/q90 are not
+   meaningful ([`src/series.py:18-20`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L18-L20)).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as user / benchmark
+    participant A as API server
+    participant C as config_schema
+    participant R as run.main
+
+    U->>A: config {history_length, prediction_length, ...}
+    A->>C: validate_config(config)
+    C-->>A: resolved + errors
+    alt errors
+        A-->>U: 422 with readable messages
+    else valid
+        A->>R: start Job with resolved config
+        R->>R: cross-field check against row count
+        R->>R: slice window and forecast
+    end
+```
+
+<!-- Sources: src/config_schema.py:98-130, src/run.py:74-87, src/run.py:113-119 -->
+
+The two-stage check is deliberate: the per-key schema runs before any data
+exists (API server, `--check-config`), and the cross-field rule runs inside the
+container where the row count is known
+([`fdo.json:63-66`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L63-L66)).
+
+## Back-testing with `prediction_offset`
+
+```mermaid
+flowchart LR
+    subgraph File["input.parquet"]
+        direction LR
+        A["history<br>history_length rows"] --> B["offset<br>prediction_offset rows"]
+    end
+    A --> P["forecast<br>prediction_length rows"]
+    B -. "held-out truth" .-> P
+```
+
+<!-- Sources: src/run.py:121-125, fdo.json:49-55 -->
+
+With `prediction_offset=8`, the model forecasts the 8 rows it skipped, so the
+output can be compared directly with known values.
+
+## `statistic` semantics
+
+| Value | Code path | Result for window `[1089.8 … 128208.3]` |
+|---|---|---|
+| `mean` | `values.mean()` | 14,029.19 |
+| `median` | `np.median(values)` | 2,953.07 |
+| `last` | `values[-1]` | 4,267.20 |
+
+Source: [`src/model.py:27-46`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L46).
+The q10/q90 are **not** affected by `statistic`; they are always the empirical
+quantiles of the same window
+([`src/model.py:92`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L92)).
+
+## Defaults and unknown keys
+
+Optional keys are filled from the card's `default` before the model sees them
+([`src/config_schema.py:123-130`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L123-L130)).
+Unknown keys are rejected together, not one at a time:
+
+```json
+{"history_length": 34, "prediction_length": 8, "horizon": 8}
+```
+
+```text
+ERROR: config.json has unrecognised key(s): 'horizon'
+```
+
+Source: [`src/config_schema.py:80-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L80-L82).
+
+## Error message catalogue
+
+| Condition | Message shape | Source |
+|---|---|---|
+| Missing key | `config.json missing required key: '<name>'` | [`config_schema.py:77-79`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L77-L79) |
+| Wrong type | `config.json key '<k>' must be a <type>` | [`config_schema.py:85-87`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L85-L87) |
+| Below minimum | `config.json key '<k>' must be >= <n>` | [`config_schema.py:88-89`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L88-L89) |
+| Above maximum | `config.json key '<k>' must be <= <n>` | [`config_schema.py:90-91`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L90-L91) |
+| Bad enum | `config.json key '<k>' must be one of 'mean', 'median', 'last'` | [`config_schema.py:92-94`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L92-L94) |
+| Unknown key | `config.json has unrecognised key(s): 'x', 'y'` | [`config_schema.py:80-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L80-L82) |
+| Too little data | `not enough input data: ... has only N rows` | [`run.py:113-119`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L113-L119) |
+
+## Worked examples
+
+### Benchmark run (8-week horizon)
+
+```json
+{"history_length": 34, "prediction_length": 8, "prediction_offset": 0, "statistic": "mean"}
+```
+
+Uses the last 34 rows, writes 8 rows, all with the same point and interval.
+
+### Back-test against known data
+
+```json
+{"history_length": 34, "prediction_length": 8, "prediction_offset": 8}
+```
+
+Skips the last 8 rows, forecasts them from the preceding 34, so the result can
+be compared with the held-out truth
+([`fdo.json:49-55`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L49-L55)).
+
+### Minimum viable config
+
+```json
+{"history_length": 3, "prediction_length": 1}
+```
+
+`prediction_offset` defaults to 0 and `statistic` to `mean`.
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Container Contract](./container-contract.md) | Where the config file lives |
+| [Model Card and Config Validation](../02-architecture/model-card-and-validation.md) | How the card becomes a validator |
+| [The Null Forecast](../02-architecture/null-forecast.md) | What the statistic does to the output |
+
+## References
+
+- [`fdo.json:31-67`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L67)
+- [`src/config_schema.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py)
+- [`src/run.py:84-98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L84-L98)
+</doc>
+
+<doc title="Local Development" path="01-getting-started/local-development.md">
+# Local Development
+
+## The shortest feedback loop
+
+The container contract is just a directory layout, so the fastest way to run the
+model is to point `WORK_DIR` at a local folder
+([`src/run.py:35-44`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L35-L44)):
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-test.txt
+
+mkdir -p work/input work/output
+cat > work/input/config.json <<'JSON'
+{"history_length": 34, "prediction_length": 8, "statistic": "mean"}
+JSON
+# copy or generate work/input/input.parquet (first two columns: time, target)
+
+WORK_DIR=./work python src/run.py
+column -t -s $'\t' work/output/predictions.tsv
+```
+
+```mermaid
+flowchart LR
+    A["work/input/config.json"] --> C["python src/run.py"]
+    B["work/input/input.parquet"] --> C
+    C --> D["work/output/predictions.tsv"]
+    E["WORK_DIR=./work"] -.-> C
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E dark
+```
+
+<!-- Sources: src/run.py:35-44, src/run.py:61-67, src/run.py:143-145 -->
+
+No `PYTHONPATH` is needed: `run.py` inserts its own directory into `sys.path`
+([`src/run.py:22-26`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L22-L26)).
+
+## Validate a config without data
+
+```bash
+WORK_DIR=./work python src/run.py --check-config
+# Config: history_length=34, prediction_length=8, prediction_offset=0, statistic=mean
+# config.json OK
+```
+
+This path returns before `input.parquet` is touched
+([`src/run.py:96-98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L96-L98)),
+which makes it safe to run against an empty `work/input`.
+
+## Tests
+
+```bash
+pytest tests/ -v          # 83 tests
+pytest tests/test_model.py -v
+pytest tests/test_run.py::test_predictions_are_written_with_the_expected_values -v
+```
+
+| File | What it locks down | Tests |
+|---|---|---|
+| `tests/test_config_schema.py` | Card/model agreement, defaults, error text | 17 |
+| `tests/test_model.py` | Point statistics, quantiles, clamping, axis output | 18 |
+| `tests/test_series.py` | Axis kinds, uniform step, DST, gap policy | 22 |
+| `tests/test_run.py` | Full CLI: config, data errors, TSV output | 26 |
+
+Source: [`tests/`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/tree/main/tests).
+
+```mermaid
+flowchart TD
+    subgraph Unit["Unit tests"]
+        CS["test_config_schema<br>card + validator"]
+        SR["test_series<br>axis + gaps"]
+        MD["test_model<br>forecast math"]
+    end
+    subgraph Integration["Integration tests"]
+        RN["test_run<br>subprocess-level CLI"]
+    end
+    CS --> RN
+    SR --> RN
+    MD --> RN
+    RN --> OUT["predictions.tsv assertions"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class CS,SR,MD,RN,OUT dark
+```
+
+<!-- Sources: tests/test_config_schema.py, tests/test_series.py, tests/test_model.py, tests/test_run.py -->
+
+A useful pattern in this repo: `test_run.py` invokes `main()` with a temporary
+`WORK_DIR` and asserts on the written TSV, so the tests exercise the same code
+path as the container
+([`tests/test_run.py:153-170`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_run.py#L153-L170)).
+
+## Build the image
+
+```bash
+docker build -t episerve/generic-null-model:dev .
+docker run --rm \
+  -v $(pwd)/work/input:/work/input \
+  -v $(pwd)/work/output:/work/output \
+  episerve/generic-null-model:dev
+```
+
+The image is `python:3.11-slim`, installs `requirements.txt`, copies the repo and
+sets `ENTRYPOINT ["python", "src/run.py"]`
+([`Dockerfile:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/Dockerfile#L1-L10)).
+There is no `CMD`, so extra arguments such as `--check-config` are appended to
+the entrypoint.
+
+## CI/CD
+
+```mermaid
+flowchart TD
+    P["push / PR"] --> MC["job: model-card<br>episerve_specs action"]
+    P --> BT["job: build-and-test"]
+    BT --> B["build image (load)"]
+    B --> T["run pytest inside image"]
+    T --> Q{"push event?"}
+    Q -- branch main --> L["push :latest"]
+    Q -- tag v* --> V["push :vX.Y.Z + :latest"]
+    Q -- PR --> S["stop after tests"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class P,MC,BT,B,T,Q,L,V,S dark
+```
+
+<!-- Sources: .github/workflows/publish.yml:17-83 -->
+
+Two design choices stand out:
+
+1. **The card job is separate.** An invalid `fdo.json` fails a visible check but
+   does not block the image, so a documentation fix can ship independently
+   ([`.github/workflows/publish.yml:18-24`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L18-L24)).
+2. **Tests run inside the built image**, not on the runner
+   ([`.github/workflows/publish.yml:57-63`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L57-L63)).
+   That catches missing runtime dependencies that a host `pip install` would
+   hide.
+
+## Release checklist
+
+| Step | Command | Result |
+|---|---|---|
+| 1. Tests | `pytest tests/ -v` | 83 passed |
+| 2. Card | `episerve-validate fdo.json` | 0 errors |
+| 3. Image | `docker build -t … .` | local image |
+| 4. Publish | `git push origin main` | `:latest` on GHCR |
+| 5. Version | `git tag v0.1.0 && git push origin v0.1.0` | `:v0.1.0` + `:latest` |
+
+Source: [`README.md:120-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L120-L127),
+[`.github/workflows/publish.yml:65-83`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L65-L83).
+
+## Common failures
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `config.json not found` | `WORK_DIR` points at the wrong directory | check `_work_dir()` output |
+| `input.parquet must have at least 2 columns` | covariates-only file | put time first, target second |
+| `x values must have a uniform step` | irregular axis | resample before the run |
+| `NaN gap longer than 8` | long missing run | fill or shorten the window |
+| `history_length + prediction_offset > rows` | window larger than file | lower `history_length` |
+
+Source: [`src/run.py:65-119`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L65-L119),
+[`src/series.py:136-191`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L191).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Container Contract](./container-contract.md) | The files this page reproduces locally |
+| [Execution Pipeline](../02-architecture/execution-pipeline.md) | What to read when a test fails |
+| [Contributor Guide](../onboarding/contributor-guide.md) | The full onboarding path |
+
+## References
+
+- [`README.md:102-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L102-L127)
+- [`Dockerfile`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/Dockerfile)
+- [`.github/workflows/publish.yml`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml)
+</doc>
+
+<doc title="Execution Pipeline" path="02-architecture/execution-pipeline.md">
+# Execution Pipeline
+
+## Why the pipeline is one function
+
+`main()` is intentionally a straight line of about 100 statements: parse
+arguments, resolve the work directory, read and validate config, read and check
+data, slice the window, forecast, write. There is no framework, no plugin
+registry and no dependency injection. For a model whose entire job is one
+arithmetic operation, indirection would cost more than it saves
+([`src/run.py:47-148`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47-L148)).
+
+| Stage | Lines | Failure mode | Exit |
+|---|---|---|---|
+| Parse args | 53–59 | argparse error | 2 (argparse) |
+| Resolve work dir | 61–63 | none | — |
+| Read config | 65–72 | missing / invalid JSON | 1 |
+| Validate config | 74–82 | schema errors / bad card | 1 |
+| Print resolved config | 84–94 | none | — |
+| `--check-config` | 96–98 | none | 0 |
+| Read parquet | 100–105 | missing file / parse error | 1 |
+| Column count | 107–111 | fewer than 2 | 1 |
+| Row count | 113–119 | window exceeds file | 1 |
+| Slice window | 121–125 | none | — |
+| Forecast | 130–141 | `ValueError` / unexpected | 1 |
+| Write TSV | 143–147 | I/O error | uncaught |
+
+Source: [`src/run.py:47-148`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47-L148).
+
+## Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CLI as argv
+    participant M as main()
+    participant S as config_schema
+    participant P as pandas
+    participant F as model.forecast
+    participant O as predictions.tsv
+
+    CLI->>M: --check-config?
+    M->>M: _work_dir()
+    M->>P: read config.json
+    M->>S: validate_config(config)
+    S-->>M: resolved, errors
+    alt errors
+        M-->>CLI: ERROR lines, exit 1
+    end
+    alt --check-config
+        M-->>CLI: config.json OK, exit 0
+    end
+    M->>P: read_parquet(input.parquet)
+    P-->>M: DataFrame
+    M->>M: check columns and rows
+    M->>M: window = data.iloc[start:end]
+    M->>F: forecast(x, y, H, statistic, row_offset=start)
+    F-->>M: DataFrame
+    M->>O: to_csv(sep="\t", index=False)
+    M-->>CLI: exit 0
+```
+
+<!-- Sources: src/run.py:53-148 -->
+
+## State machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> ResolveWork
+    ResolveWork --> ReadConfig
+    ReadConfig --> Validate: JSON parsed
+    ReadConfig --> Fail: missing / invalid JSON
+    Validate --> CheckConfig: valid
+    Validate --> Fail: errors
+    CheckConfig --> [*]: --check-config
+    CheckConfig --> ReadData: normal run
+    ReadData --> CheckShape
+    ReadData --> Fail: parquet missing
+    CheckShape --> Window: >=2 columns, enough rows
+    CheckShape --> Fail: too few columns / rows
+    Window --> Forecast
+    Forecast --> Write: ok
+    Forecast --> Fail: ValueError / Exception
+    Write --> [*]: exit 0
+    Fail --> [*]: exit 1
+```
+
+<!-- Sources: src/run.py:61-148 -->
+
+## The window slice
+
+```mermaid
+flowchart LR
+    A["len(data)"] --> B["end = len - offset"]
+    B --> C["start = end - history_length"]
+    C --> D["window = data.iloc[start:end]"]
+    D --> E["x = window.iloc[:, 0]"]
+    D --> F["y = window.iloc[:, 1]"]
+    E --> G["future_values(x, H)"]
+    F --> H["prepare_target(y)"]
+    G --> I["forecast frame"]
+    H --> I
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H,I dark
+```
+
+<!-- Sources: src/run.py:121-137, src/model.py:89-99 -->
+
+`row_offset=start` is passed only so a string axis can report absolute row
+positions; for datetime and numeric axes it is ignored
+([`src/run.py:131-137`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L131-L137),
+[`src/model.py:99-101`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L99-L101)).
+
+## Failure handling
+
+```mermaid
+flowchart TD
+    A["exception"] --> B{"ValueError?"}
+    B -- yes --> C["_fail(str(exc))"]
+    B -- no --> D["_fail('model failed: ...')"]
+    C --> E["stderr: ERROR: ..."]
+    D --> E
+    E --> F["exit 1"]
+    G["SchemaError"] --> H["_fail('model card ... invalid')"]
+    H --> E
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H dark
+```
+
+<!-- Sources: src/run.py:69-82, src/run.py:130-141 -->
+
+The broad `except Exception` at the end is a deliberate contract choice: the
+runner should receive an `ERROR:` line, not a traceback it cannot parse. The
+comment says so explicitly
+([`src/run.py:140-141`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L140-L141)).
+
+## Class view
+
+```mermaid
+classDiagram
+    class main {
+        +_work_dir() Path
+        +_fail(msg) int
+    }
+    class config_schema {
+        +load_parameters(path) dict
+        +validate_config(config, parameters) tuple
+        -_describe(error) str
+    }
+    class model {
+        +forecast(x, y, H, statistic, row_offset) DataFrame
+        -_point_forecast(values, statistic) float
+    }
+    class series {
+        +future_values(x, steps) tuple
+        +prepare_target(y) ndarray
+        +coerce_datetime_axis(x) Series
+    }
+    main --> config_schema
+    main --> model
+    model --> series
+```
+
+<!-- Sources: src/run.py:25-26, src/model.py:15, src/config_schema.py:38-130 -->
+
+## Why this order
+
+- **Config before data.** A bad config should fail in milliseconds, before a
+  multi-gigabyte parquet file is read.
+- **Column count before row count.** The error that explains the *shape* of the
+  input is more useful than a window-size error caused by the same file.
+- **Cross-field rule after loading.** `history_length + offset ≤ rows` cannot be
+  checked without the row count, which is why it lives in `run.py` rather than in
+  the JSON Schema ([`fdo.json:63-66`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L63-L66)).
+- **Forecast before output directory creation.** `output/` is only created after
+  a successful forecast, so a failed run does not leave an empty directory that
+  could be mistaken for success ([`src/run.py:143`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L143)).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Container Contract](../01-getting-started/container-contract.md) | The external view of this pipeline |
+| [Time Axis and Target Handling](./series-handling.md) | What happens inside the forecast call |
+| [The Null Forecast](./null-forecast.md) | The arithmetic at the centre |
+| [Model Card and Config Validation](./model-card-and-validation.md) | The first two stages in depth |
+
+## References
+
+- [`src/run.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py)
+- [`src/model.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py)
+</doc>
+
+<doc title="Time Axis and Target Handling" path="02-architecture/series-handling.md">
+# Time Axis and Target Handling
+
+## Why this is separate from the forecast
+
+The null forecast itself is one line of arithmetic. Almost all of the code that
+can fail lives in the two preparations around it: deciding what the future x
+values are, and turning a possibly gappy target column into a clean array
+([`src/series.py:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L1-L10)).
+Keeping them in their own module means they can be tested exhaustively without
+constructing a forecast.
+
+| Function | Responsibility | Source |
+|---|---|---|
+| `coerce_datetime_axis` | Turn date-like objects/strings into datetimes when unambiguous | [`series.py:71-104`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L71-L104) |
+| `future_values` | Extrapolate the horizon for the detected axis kind | [`series.py:136-191`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L191) |
+| `prepare_target` | Validate numeric target and fill/reject gaps | [`series.py:221-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L221-L257) |
+| `_require_ordered` | NaN, uniqueness, monotonicity | [`series.py:30-45`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L30-L45) |
+| `_require_uniform_step` | Constant spacing (ns tolerance for timedeltas) | [`series.py:48-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L48-L68) |
+
+## Axis dispatch
+
+```mermaid
+flowchart TD
+    A["x_series"] --> B["coerce_datetime_axis"]
+    B --> C{"datetime64?"}
+    C -- yes --> D["_require_ordered<br>_datetime_step"]
+    D --> E["last + step*(i+1)"]
+    C -- no --> F{"timedelta64?"}
+    F -- yes --> G["_require_ordered<br>uniform step"]
+    G --> E
+    F -- no --> H{"numeric?"}
+    H -- yes --> I["_require_ordered<br>uniform positive step"]
+    I --> E
+    H -- no --> J{"object/string?"}
+    J -- yes --> K["_require_ordered<br>positions base+1.."]
+    K --> L["positional = true"]
+    J -- no --> M["ValueError"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H,I,J,K,L,M dark
+```
+
+<!-- Sources: src/series.py:136-191 -->
+
+The branch order matters: a datetime column is also an object column in older
+pandas dtypes, so the datetime check must come first. String labels that happen
+to parse as dates are converted; strings that do not (ISO weeks such as
+`2022-W01`) fall through to the positional branch
+([`src/series.py:85-104`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L85-L104)).
+
+## Datetime axes and calendar frequencies
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant F as future_values
+    participant C as coerce_datetime_axis
+    participant I as pd.infer_freq
+    participant T as to_offset
+
+    F->>C: x_series
+    C-->>F: datetime series
+    F->>F: _require_ordered
+    F->>I: DatetimeIndex(x)
+    alt frequency found
+        I-->>F: "D" / "W-MON" / "MS" ...
+        F->>T: frequency
+        T-->>F: DateOffset
+    else no frequency
+        F->>F: diff, _require_uniform_step
+        F-->>F: first timedelta
+    end
+    F-->>F: last + step*(i+1)
+```
+
+<!-- Sources: src/series.py:107-133, src/series.py:162-166 -->
+
+Using a calendar offset instead of a fixed `timedelta` is what makes daily data
+survive DST and monthly data survive month lengths
+([`src/series.py:107-129`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L107-L129)).
+For sub-second irregularity the code compares nanoseconds with `atol=1`, not a
+relative tolerance, so one second of drift on a daily series is not silently
+accepted ([`src/series.py:59-64`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L59-L64)).
+
+| Axis | Step used | Output | Example |
+|---|---|---|---|
+| Daily datetime | `pd.infer_freq` → `Day()` | next dates | 2026-08-18 → 2026-08-19 |
+| Weekly datetime | `Week(weekday=…)` | next weeks | … |
+| Monthly datetime | `MonthBegin()` | next months | 2026-01-01 → 2026-02-01 |
+| Uniform timedelta | first diff | last + k·diff | `0 days 06:00:00` |
+| Numeric | first diff (must be > 0) | last + k·diff | `1.0, 2.0, …` |
+| String | row position | `n+1, n+2, …` + `x_auto_converted` | `2022-W01` → `3` |
+
+Source: [`src/series.py:136-191`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L191).
+
+## String axes
+
+A string axis has no arithmetic, so the model continues it as **1-indexed row
+positions** and adds an `x_auto_converted` column
+([`src/series.py:186-189`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L186-L189)):
+
+```text
+x, y, y_q10, y_q90
+2022-W01, 10, 9, 11
+...
+```
+
+becomes, for a window of 10 rows and 2 steps:
+
+```text
+x, x_auto_converted, y, y_q10, y_q90
+11, 11, 10, 9, 11
+12, 12, 10, 9, 11
+```
+
+The `row_offset` passed from `run.py` makes those positions absolute in the
+whole input file, not relative to the window
+([`src/model.py:99-101`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L99-L101)).
+
+```mermaid
+flowchart LR
+    A["window starts at row 100<br>10 string labels"] --> B["future = 11..12"]
+    B --> C["+ row_offset 100"]
+    C --> D["111, 112"]
+    D --> E["x_auto_converted"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E dark
+```
+
+<!-- Sources: src/series.py:186-189, src/model.py:99-101, src/run.py:131-137 -->
+
+## Target gap policy
+
+```mermaid
+flowchart TD
+    A["y_series"] --> B{"numeric?"}
+    B -- no --> X["ValueError: must be numeric"]
+    B -- yes --> C{"all NaN?"}
+    C -- yes --> X2["ValueError: at least one non-NaN"]
+    C -- no --> D["_longest_interior_gap"]
+    D --> E{"gap > 8?"}
+    E -- yes --> X3["ValueError: gap longer than 8"]
+    E -- no --> F["fill leading/trailing<br>from nearest value"]
+    F --> G["interpolate interior<br>limit=8"]
+    G --> H["float array, no NaN"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H,X,X2,X3 dark
+```
+
+<!-- Sources: src/series.py:221-257 -->
+
+| Gap location | Length | Action |
+|---|---|---|
+| Interior | ≤ 8 | linear interpolation |
+| Interior | > 8 | reject with an error naming the column |
+| Leading | any | fill with first observed value |
+| Trailing | any | fill with last observed value |
+| Entire series | — | reject |
+
+Source: [`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25),
+[`src/series.py:242-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L242-L257).
+
+The asymmetry is intentional: a leading/trailing gap means "the series starts or
+ends later", and the nearest value is the best available statement about the
+edge. An interior gap longer than 8 means the window no longer describes the
+series, so fabricating it would make the null model dishonest
+([`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25)).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Execution Pipeline](./execution-pipeline.md) | Where these functions are called |
+| [The Null Forecast](./null-forecast.md) | What happens to the prepared array |
+| [Configuration](../01-getting-started/configuration.md) | `history_length` and the window |
+
+## References
+
+- [`src/series.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py)
+- [`tests/test_series.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_series.py)
+</doc>
+
+<doc title="The Null Forecast" path="02-architecture/null-forecast.md">
+# The Null Forecast
+
+## The hypothesis
+
+The null model asserts: *the future is distributed like one summary statistic of
+the recent past*. Concretely, for a window `W = y[n-k … n-1]` and horizon `H`:
+
+```text
+point_h = statistic(W)          for every h = 1 … H
+q10_h   = quantile(W, 0.1)      for every h
+q90_h   = quantile(W, 0.9)      for every h
+```
+
+There is no `h` on the right-hand side. That is the whole model
+([`src/model.py:49-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49-L114)).
+
+| Quantity | Formula | Source |
+|---|---|---|
+| Point | `mean(W)` / `median(W)` / `W[-1]` | [`model.py:27-46`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L46) |
+| Interval | `np.quantile(W, [0.1, 0.9])` | [`model.py:92`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L92) |
+| Clamp | `q10 = min(q10, point)`, `q90 = max(q90, point)` | [`model.py:96-97`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L96-L97) |
+| Repetition | one row per `h`, same values | [`model.py:106-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L106-L114) |
+
+## Flow
+
+```mermaid
+flowchart TD
+    A["window y (float array)"] --> B["prepare_target<br>no NaN"]
+    B --> C["point = statistic"]
+    B --> D["q10, q90 = quantile 10/90"]
+    C --> E{"q10 <= point <= q90?"}
+    D --> E
+    E -- no --> F["q10 = min(q10, point)<br>q90 = max(q90, point)"]
+    E -- yes --> G["keep"]
+    F --> H["build rows"]
+    G --> H
+    H --> I["for h in 1..H:<br>x = future[h]<br>y = point<br>q10 = q10<br>q90 = q90"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H,I dark
+```
+
+<!-- Sources: src/model.py:89-114 -->
+
+## Why the clamp is necessary
+
+The mean and the 10th/90th percentile are computed on the same window, but they
+are not ordered by construction. A window with one very large spike has a mean
+above its 90th percentile; a `last` value that is the minimum of the window is
+below its 10th percentile. In both cases the point would lie outside its own
+interval, which is incoherent for a forecast
+([`src/model.py:93-97`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L93-L97)).
+
+```mermaid
+flowchart LR
+    subgraph Skewed["Skewed window"]
+        M["mean = 14,029"] --> Q["q90 = 39,225"]
+    end
+    subgraph LastMin["Last = minimum"]
+        L["last = 1,090"] --> Q10["q10 = 1,469"]
+    end
+    Skewed --> C1["clamp q90 up to mean<br>no change needed"]
+    LastMin --> C2["clamp q10 down to last"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class M,Q,L,Q10,C1,C2 dark
+```
+
+<!-- Sources: src/model.py:92-97 -->
+
+The rule is minimal: only the violating bound moves, and only as far as the
+point. The interval never narrows.
+
+## Why the output is flat
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant W as window
+    participant F as forecast
+    participant R as rows
+
+    W->>F: y[n-k .. n-1]
+    F->>F: point = mean(W)
+    F->>F: q10, q90 = quantile(W)
+    loop h = 1..H
+        F->>R: row(h) = {x: future[h], y: point, q10, q90}
+    end
+    Note over F,R: point, q10, q90 never change
+```
+
+<!-- Sources: src/model.py:99-114 -->
+
+This is a **direct multi-step** forecast: the statistic is computed once from
+observed history and never updated with its own predictions. A recursive variant
+would append each forecast to the window and recompute; it is deliberately absent
+([`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138)).
+
+### Direct vs recursive, concretely
+
+For `k=2`, a recursive mean would produce
+`f_h = y_n - (y_n - y_{n-1}) / 2^h`: the last difference is halved at every step,
+so the path converges to `y_n` rather than following a trend. On the AMELAG
+benchmark that made the forecast worse, not better (MAE 14,960 vs 8,866 for the
+flat 34-week mean). The flat model is both simpler and, on that window, more
+accurate.
+
+| Variant | h=1 | h=2 | h=3 | Limit | Benchmark MAE |
+|---|---|---|---|---|---|
+| Flat mean k=34 | 14,029 | 14,029 | 14,029 | 14,029 | **8,866** |
+| Recursive mean k=2 | 3,411 | 3,839 | 3,625 | 4,267 | 14,960 |
+
+Source: offline replay of the benchmark input; see the
+[project README](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model#method).
+
+## The output frame
+
+```mermaid
+erDiagram
+    FORECAST_ROW {
+        any x "time axis value"
+        int x_auto_converted "string axis only"
+        float y "repeated point"
+        float y_q10 "lower bound"
+        float y_q90 "upper bound"
+    }
+```
+
+<!-- Sources: src/model.py:103-114, fdo.json:94-108 -->
+
+Column names are taken from the input series, so the model is dataset-agnostic
+([`src/model.py:103-104`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L103-L104)).
+If a series is unnamed, the fallbacks are `x` and `y`
+([`src/model.py:103-104`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L103-L104)).
+
+## Validation inside `forecast`
+
+| Check | Condition | Error |
+|---|---|---|
+| Horizon positive | `H > 0` | `prediction_length must be > 0` |
+| Horizon bounded | `H ≤ 512` | `prediction_length=… exceeds max 512` |
+| Statistic known | in `mean/median/last` | `statistic must be one of …` |
+| History long enough | `len(x) ≥ 3` | `history must contain at least 3 points` |
+
+Source: [`src/model.py:76-87`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L76-L87).
+These duplicate the card bounds on purpose: `forecast()` is also callable as a
+library, and it should not trust its caller
+([`tests/test_model.py:105-122`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_model.py#L105-L122)).
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Time Axis and Target Handling](./series-handling.md) | How the window array is prepared |
+| [Configuration](../01-getting-started/configuration.md) | How `statistic` and `history_length` are chosen |
+| [Staff Engineer Guide](../onboarding/staff-engineer-guide.md) | Why the design stops here |
+
+## References
+
+- [`src/model.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py)
+- [`tests/test_model.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_model.py)
+- [`fdo.json:119-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L119-L127)
+</doc>
+
+<doc title="Model Card and Config Validation" path="02-architecture/model-card-and-validation.md">
+# Model Card and Config Validation
+
+## Why the card is the source of truth
+
+The platform needs to know three things before it can run a model: what
+parameters it accepts, what files it reads, and what it writes. In EPISERVE those
+are declared once in `fdo.json`, the **model card**, which follows the
+[model-card v1 spec](https://github.com/The-EPISERVE-Consortium/episerve_specs/blob/main/src/episerve_specs/specs/model_card/README.md)
+([`fdo.json:1-7`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L1-L7)).
+
+The card is not documentation that happens to be machine-readable; it is the
+input to the validator. `config_schema.py` loads `episerve:parameters` from the
+card and hands it to `jsonschema`
+([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
+Changing a bound in the card changes what the API server accepts, what
+`--check-config` accepts, and what the tests assert — without touching Python
+logic.
+
+| Card section | Consumer | Source |
+|---|---|---|
+| `episerve:task` | API server, benchmark workflow | [`fdo.json:18-29`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L18-L29) |
+| `episerve:parameters` | `config_schema.validate_config` | [`fdo.json:31-67`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L67) |
+| `episerve:inputs` | runner preflight | [`fdo.json:69-92`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L69-L92) |
+| `episerve:outputs` | runner postflight, scoring | [`fdo.json:94-109`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L94-L109) |
+| `episerve:resources` | Kubernetes Job spec | [`fdo.json:111-117`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L111-L117) |
+| `episerve:documentation` | catalog / model page | [`fdo.json:119-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L119-L127) |
+
+## Validation flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Card as fdo.json
+    participant CS as config_schema
+    participant V as Draft202012Validator
+    participant Run as run.main
+
+    Run->>CS: validate_config(config)
+    CS->>Card: read_text()
+    CS->>CS: json.loads
+    CS->>CS: check_schema(parameters)
+    alt card invalid
+        CS-->>Run: SchemaError
+    else card valid
+        CS->>V: Validator(parameters)
+        V-->>CS: iter_errors(config)
+        CS->>CS: _describe each error
+        CS->>CS: fill defaults
+        CS-->>Run: (resolved, errors)
+    end
+```
+
+<!-- Sources: src/config_schema.py:38-130 -->
+
+The two error classes are deliberately distinct:
+
+| Exception | Meaning | Who fixes it |
+|---|---|---|
+| `SchemaError` | The card is missing, not JSON, or not a valid JSON Schema | Maintainer |
+| validation errors | The user's `config.json` is wrong | Caller |
+
+`run.py` reports them differently: a card problem says *"model card (fdo.json)
+parameters are invalid"*, a config problem prints each user-facing message
+([`src/run.py:74-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L74-L82)).
+
+## The parameter schema
+
+```mermaid
+classDiagram
+    class Parameters {
+        type: object
+        required: [history_length, prediction_length]
+        additionalProperties: false
+        rules: list
+    }
+    class HistoryLength {
+        type: integer
+        minimum: 3
+        unit: steps
+    }
+    class PredictionLength {
+        type: integer
+        minimum: 1
+        maximum: 512
+    }
+    class PredictionOffset {
+        type: integer
+        minimum: 0
+        default: 0
+    }
+    class Statistic {
+        type: string
+        enum: [mean, median, last]
+        default: mean
+    }
+    Parameters --> HistoryLength
+    Parameters --> PredictionLength
+    Parameters --> PredictionOffset
+    Parameters --> Statistic
+```
+
+<!-- Sources: fdo.json:31-67 -->
+
+Two details are worth calling out:
+
+- **`additionalProperties: false`** makes unknown keys an error. This is why a
+  typo such as `history_lenght` fails loudly instead of silently using the
+  default ([`fdo.json:34`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L34)).
+- **`rules`** is not JSON Schema; it is a list of human-readable cross-field
+  constraints that `run.py` enforces after loading data
+  ([`fdo.json:63-66`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L63-L66)).
+
+## How errors become readable
+
+`_describe` maps `jsonschema` error objects to one-line messages keyed by the
+offending parameter
+([`src/config_schema.py:71-95`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L71-L95)):
+
+```mermaid
+flowchart TD
+    E["jsonschema error"] --> V{"validator"}
+    V -- required --> R["missing required key"]
+    V -- additionalProperties --> A["unrecognised key(s)"]
+    V -- type --> T["must be a/an <type>"]
+    V -- minimum --> M["must be >= n"]
+    V -- maximum --> X["must be <= n"]
+    V -- enum --> N["must be one of ..."]
+    V -- other --> O["raw message"]
+    R --> S["sorted, one line per error"]
+    A --> S
+    T --> S
+    M --> S
+    X --> S
+    N --> S
+    O --> S
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class E,V,R,A,T,M,X,N,O,S dark
+```
+
+<!-- Sources: src/config_schema.py:71-95 -->
+
+Errors are sorted by path so that two runs with the same bad config produce the
+same output order
+([`src/config_schema.py:117-121`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L117-L121)).
+That is what makes the CLI output testable.
+
+## Defaults
+
+```mermaid
+flowchart LR
+    A["config dict"] --> B{"key declared?"}
+    B -- yes --> C["keep value"]
+    B -- no --> D{"default in card?"}
+    D -- yes --> E["use default"]
+    D -- no --> F["omit from resolved"]
+    C --> G["resolved"]
+    E --> G
+    F --> G
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G dark
+```
+
+<!-- Sources: src/config_schema.py:123-130 -->
+
+`resolved` always contains every declared key that has a value or a default. For
+this card, a minimal `{"history_length": 3, "prediction_length": 1}` resolves to
+all four keys, with `prediction_offset=0` and `statistic="mean"`
+([`tests/test_config_schema.py:65-74`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_config_schema.py#L65-L74)).
+
+## Card validation in CI
+
+```mermaid
+flowchart TD
+    P["push / PR"] --> C["job: model-card"]
+    C --> A["The-EPISERVE-Consortium/episerve_specs@v0.4.0"]
+    A --> R{"valid?"}
+    R -- yes --> OK["green check"]
+    R -- no --> ERR["red check, image still builds"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class P,C,A,R,OK,ERR dark
+```
+
+<!-- Sources: .github/workflows/publish.yml:18-24 -->
+
+The card job is independent of `build-and-test`, so an invalid card is visible
+but does not block a code fix from shipping
+([`.github/workflows/publish.yml:18-21`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L18-L21)).
+Locally:
+
+```bash
+pip install "git+https://github.com/The-EPISERVE-Consortium/episerve_specs@v0.4.0"
+episerve-validate fdo.json
+```
+
+## Parameter roles
+
+`episerve:task.parameterRoles` tells the benchmark workflow which parameters to
+prefill from the dataset split
+([`fdo.json:24-28`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L24-L28)):
+
+| Role | Parameter | Used for |
+|---|---|---|
+| `horizon` | `prediction_length` | test-window length |
+| `history` | `history_length` | history window |
+| `offset` | `prediction_offset` | back-test gap |
+
+Without this mapping the workflow would have to special-case every model's
+parameter names.
+
+## Related Pages
+
+| Page | Why read it |
+|---|---|
+| [Configuration](../01-getting-started/configuration.md) | The user-facing view of these keys |
+| [Execution Pipeline](./execution-pipeline.md) | Where validation sits in the run |
+| [Local Development](../01-getting-started/local-development.md) | Running `episerve-validate` |
+
+## References
+
+- [`fdo.json`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json)
+- [`src/config_schema.py`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py)
+- [EPISERVE model-card v1 spec](https://github.com/The-EPISERVE-Consortium/episerve_specs/blob/main/src/episerve_specs/specs/model_card/README.md)
+</doc>
+
+<doc title="Documentation Index" path="index.md">
+# model__prediction__generic__null-model
+
+A dataset-agnostic **null forecaster** for the EPISERVE platform. It reads a time
+series, computes one statistic of a trailing window (`mean`, `median` or
+`last`), and writes that same value for every forecast step together with the
+window's empirical 10th and 90th percentiles. It has no weights, no training, no
+network access and no GPU — it is the performance floor that every real model
+must beat, and a five-second end-to-end check of the model-runner pipeline
+([`fdo.json:119-127`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L119-L127)).
+
+## Quick start
+
+```bash
+# 1. Install the two runtime dependencies plus pytest
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-test.txt
+
+# 2. Put a config and a parquet file under ./work/input/
+mkdir -p work/input work/output
+cat > work/input/config.json <<'JSON'
+{"history_length": 34, "prediction_length": 8, "statistic": "mean"}
+JSON
+# work/input/input.parquet: first column = time axis, second = target
+
+# 3. Run
+WORK_DIR=./work python src/run.py
+
+# 4. Inspect
+column -t -s $'\t' work/output/predictions.tsv
+```
+
+Expected shape for a numeric target `y`: one row per step, with `y`,
+`y_q10` and `y_q90` constant across rows
+([`src/model.py:106-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L106-L114)).
+
+## Architecture at a glance
+
+```mermaid
+flowchart TD
+    A["config.json"] --> B["config_schema.validate_config"]
+    C["input.parquet"] --> D["run.main: select window"]
+    B --> D
+    D --> E["series.prepare_target<br>fill gaps, reject long gaps"]
+    D --> F["series.future_values<br>extrapolate x axis"]
+    E --> G["model.forecast<br>point + q10/q90"]
+    F --> G
+    G --> H["predictions.tsv"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class A,B,C,D,E,F,G,H dark
+```
+
+<!-- Sources: src/run.py:74, src/run.py:104-137, src/model.py:49-114, src/series.py:136, src/series.py:221 -->
+
+The pipeline is deliberately linear: **validate → slice → prepare → forecast →
+write**. There is no state between runs and no side channel
+([`src/run.py:47-148`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47-L148)).
+
+```mermaid
+flowchart TD
+    I["documentation/index.md"] --> G["Getting Started"]
+    I --> D["Deep Dive"]
+    I --> O["Onboarding"]
+    G --> G1["Overview / Contract / Config / Dev"]
+    D --> D1["Pipeline / Series / Forecast / Card"]
+    O --> O1["Contributor / Staff / Executive / PM"]
+
+    classDef dark fill:#2d333b,stroke:#6d5dfc,color:#e6edf3
+    class I,G,D,O,G1,D1,O1 dark
+```
+
+<!-- Sources: catalogue.json -->
+
+## Documentation map
+
+| Section | What it answers | Start here |
+|---|---|---|
+| Getting Started | What the model is, the container contract, config keys, local dev | [Overview](./01-getting-started/overview.md) |
+| Deep Dive | How the pipeline, axis handling, forecast and validation actually work | [Execution Pipeline](./02-architecture/execution-pipeline.md) |
+| Onboarding | Role-specific paths: contributor, staff engineer, executive, PM | [Contributor Guide](./onboarding/contributor-guide.md) |
+
+### Getting Started
+
+| Page | Description |
+|---|---|
+| [Overview](./01-getting-started/overview.md) | Purpose, flat forecast, benchmark role |
+| [Container Contract](./01-getting-started/container-contract.md) | `/work` I/O, exit codes, `--check-config` |
+| [Configuration](./01-getting-started/configuration.md) | The four parameters and their bounds |
+| [Local Development](./01-getting-started/local-development.md) | Run, test, build, publish |
+
+### Deep Dive
+
+| Page | Description |
+|---|---|
+| [Execution Pipeline](./02-architecture/execution-pipeline.md) | `main()` step by step, including failures |
+| [Time Axis and Target Handling](./02-architecture/series-handling.md) | Datetime/numeric/string axes, gap policy |
+| [The Null Forecast](./02-architecture/null-forecast.md) | Point statistic, quantiles, clamping |
+| [Model Card and Config Validation](./02-architecture/model-card-and-validation.md) | Card-driven JSON Schema validation |
+
+### Onboarding
+
+| Guide | Audience |
+|---|---|
+| [Contributor Guide](./onboarding/contributor-guide.md) | New contributors |
+| [Staff Engineer Guide](./onboarding/staff-engineer-guide.md) | Staff/principal engineers |
+| [Executive Guide](./onboarding/executive-guide.md) | Engineering leaders |
+| [Product Manager Guide](./onboarding/product-manager-guide.md) | PMs and stakeholders |
+
+## Key files
+
+| File | Responsibility | Source |
+|---|---|---|
+| `src/run.py` | Container entry point, I/O, window selection, exit codes | [`src/run.py:47`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47) |
+| `src/config_schema.py` | Loads `episerve:parameters` from the card and validates `config.json` | [`src/config_schema.py:98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L98) |
+| `src/series.py` | X-axis extrapolation and target gap handling | [`src/series.py:136`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136) |
+| `src/model.py` | Point statistic, empirical quantiles, output frame | [`src/model.py:49`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49) |
+| `fdo.json` | Model card: parameters, I/O, resources, documentation | [`fdo.json:31`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31) |
+| `Dockerfile` | `python:3.11-slim` image, entrypoint `src/run.py` | [`Dockerfile:1-10`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/Dockerfile#L1-L10) |
+| `.github/workflows/publish.yml` | Card validation, in-image tests, GHCR push | [`.github/workflows/publish.yml:17`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L17) |
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Language | Python 3.11 | Matches the other EPISERVE model images |
+| Data | pandas + pyarrow | Parquet input, TSV output |
+| Numerics | NumPy | Mean, median and quantiles |
+| Validation | jsonschema (Draft 2020-12) | The card is already a JSON Schema |
+| Packaging | Docker, `python:3.11-slim` | Platform contract is a container |
+| CI/CD | GitHub Actions → GHCR | Build, test inside the image, push tags |
+
+## Reading paths
+
+- **First contact** → [Overview](./01-getting-started/overview.md) → [Container Contract](./01-getting-started/container-contract.md) → [Configuration](./01-getting-started/configuration.md)
+- **Changing the code** → [Execution Pipeline](./02-architecture/execution-pipeline.md) → [The Null Forecast](./02-architecture/null-forecast.md) → [Contributor Guide](./onboarding/contributor-guide.md)
+- **Reviewing the design** → [Staff Engineer Guide](./onboarding/staff-engineer-guide.md) → [Model Card and Config Validation](./02-architecture/model-card-and-validation.md)
+- **Non-engineering** → [Product Manager Guide](./onboarding/product-manager-guide.md) → [Executive Guide](./onboarding/executive-guide.md)
+</doc>

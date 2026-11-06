@@ -1,0 +1,37 @@
+# model__prediction__generic__null-model
+
+> Dataset-agnostic null forecaster for EPISERVE: repeats the mean, median or last value of a trailing window over the forecast horizon, with empirical q10/q90. No training, no weights, no network, no GPU.
+
+## Onboarding
+
+- [Contributor Guide](documentation/onboarding/contributor-guide.md): progressive path from Python basics to a first pull request.
+- [Staff Engineer Guide](documentation/onboarding/staff-engineer-guide.md): decision log, failure modes, tradeoffs.
+- [Executive Guide](documentation/onboarding/executive-guide.md): capability map, risk and cost.
+- [Product Manager Guide](documentation/onboarding/product-manager-guide.md): user journeys, limitations, FAQ.
+
+## Architecture
+
+- [Execution Pipeline](documentation/02-architecture/execution-pipeline.md): main() step by step and every failure path.
+- [Time Axis and Target Handling](documentation/02-architecture/series-handling.md): datetime/timedelta/numeric/string axes and gap policy.
+- [The Null Forecast](documentation/02-architecture/null-forecast.md): point statistic, empirical quantiles, clamping.
+- [Model Card and Config Validation](documentation/02-architecture/model-card-and-validation.md): fdo.json as the source of truth.
+
+## Getting Started
+
+- [Overview](documentation/01-getting-started/overview.md): purpose, flat forecast, benchmark role.
+- [Container Contract](documentation/01-getting-started/container-contract.md): /work input/output, exit codes, --check-config.
+- [Configuration](documentation/01-getting-started/configuration.md): the four parameters and their bounds.
+- [Local Development](documentation/01-getting-started/local-development.md): run, test, build, publish.
+
+## Deep Dive
+
+- [Execution Pipeline](documentation/02-architecture/execution-pipeline.md)
+- [Time Axis and Target Handling](documentation/02-architecture/series-handling.md)
+- [The Null Forecast](documentation/02-architecture/null-forecast.md)
+- [Model Card and Config Validation](documentation/02-architecture/model-card-and-validation.md)
+
+## Optional
+
+- [Repository README](README.md): install, run, release.
+- [Model card](fdo.json): machine-readable contract.
+- [Catalogue](documentation/catalogue.json): machine-readable wiki structure.

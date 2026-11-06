@@ -1,0 +1,86 @@
+{
+  "title": "model__prediction__generic__null-model",
+  "description": "A dataset-agnostic null forecaster for the EPISERVE platform: repeat one statistic of the history window, with empirical q10/q90.",
+  "source": {
+    "repo": "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model",
+    "branch": "main"
+  },
+  "sections": [
+    {
+      "title": "Getting Started",
+      "path": "01-getting-started",
+      "description": "What the model does, how the container contract works, how to configure a run, and how to develop locally.",
+      "children": [
+        {
+          "title": "Overview",
+          "path": "01-getting-started/overview.md",
+          "prompt": "Explain the purpose of the null model, its flat forecast, and its role as the EPISERVE performance floor. Cite src/model.py:49-114 and fdo.json:119-127."
+        },
+        {
+          "title": "Container Contract",
+          "path": "01-getting-started/container-contract.md",
+          "prompt": "Describe /work/input/config.json + input.parquet -> /work/output/predictions.tsv, the exit-code rules, and the --check-config mode. Cite src/run.py:47-148 and Dockerfile:1-10."
+        },
+        {
+          "title": "Configuration",
+          "path": "01-getting-started/configuration.md",
+          "prompt": "Document history_length, prediction_length, prediction_offset and statistic, their bounds and defaults, and the cross-field rule. Cite fdo.json:31-67 and src/config_schema.py:98-130."
+        },
+        {
+          "title": "Local Development",
+          "path": "01-getting-started/local-development.md",
+          "prompt": "Show how to run the model locally with WORK_DIR, how to run the 83 tests, how to build the image, and how CI publishes to GHCR. Cite src/run.py:35-44, tests/, Dockerfile and .github/workflows/publish.yml."
+        }
+      ]
+    },
+    {
+      "title": "Deep Dive",
+      "path": "02-architecture",
+      "description": "The execution pipeline, series preparation, the forecast arithmetic, and card-driven validation.",
+      "children": [
+        {
+          "title": "Execution Pipeline",
+          "path": "02-architecture/execution-pipeline.md",
+          "prompt": "Trace main() from argument parsing to predictions.tsv, including the window slice and the failure paths. Cite src/run.py:47-148."
+        },
+        {
+          "title": "Time Axis and Target Handling",
+          "path": "02-architecture/series-handling.md",
+          "prompt": "Explain future_values for datetime, timedelta, numeric and string axes, and prepare_target gap filling. Cite src/series.py:71-257."
+        },
+        {
+          "title": "The Null Forecast",
+          "path": "02-architecture/null-forecast.md",
+          "prompt": "Explain _point_forecast, the empirical quantiles, the clamping rule, and why the output is flat. Cite src/model.py:27-116."
+        },
+        {
+          "title": "Model Card and Config Validation",
+          "path": "02-architecture/model-card-and-validation.md",
+          "prompt": "Explain how fdo.json drives validation through jsonschema, how defaults are filled, and how the card is validated in CI. Cite fdo.json, src/config_schema.py:38-130 and .github/workflows/publish.yml:18-24."
+        }
+      ]
+    }
+  ],
+  "onboarding": [
+    {
+      "title": "Contributor Guide",
+      "path": "onboarding/contributor-guide.md",
+      "prompt": "Progressive guide for a new contributor: Python foundations, the four-module architecture, testing and the contribution workflow."
+    },
+    {
+      "title": "Staff Engineer Guide",
+      "path": "onboarding/staff-engineer-guide.md",
+      "prompt": "Architectural decisions, tradeoffs, failure modes and performance characteristics for senior engineers."
+    },
+    {
+      "title": "Executive Guide",
+      "path": "onboarding/executive-guide.md",
+      "prompt": "Capability map, risk assessment and investment thesis for engineering leaders; no code."
+    },
+    {
+      "title": "Product Manager Guide",
+      "path": "onboarding/product-manager-guide.md",
+      "prompt": "User journeys, capability map, limitations, data handling and FAQ for non-engineers."
+    }
+  ]
+}

@@ -11,6 +11,13 @@ No training, no weights, no network access, no GPU.
 **In:** `input.parquet` + `config.json` under `/work/input/`.
 **Out:** `predictions.tsv` under `/work/output/`.
 
+## Documentation
+
+Rendered documentation site: <https://the-episerve-consortium.github.io/model__prediction__generic__null-model/>
+
+The VitePress sources live in [`documentation/`](documentation/). GitHub also
+renders the Markdown pages directly, including the Mermaid diagrams.
+
 ## Method
 
 1. Take the history window defined by `history_length` and `prediction_offset`.
