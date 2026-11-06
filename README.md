@@ -15,18 +15,11 @@ No training, no weights, no network access, no GPU.
 
 Rendered documentation site: <https://the-episerve-consortium.github.io/model__prediction__generic__null-model/>
 
-The VitePress sources live in [`documentation/`](documentation/). GitHub also
-renders the Markdown pages directly, including the Mermaid diagrams.
+The VitePress sources live in [`documentation/`](documentation/).
 
 The documentation is a committed snapshot, not generated from the code. If you
-change the model card, parameters, I/O, errors or architecture, update
-`documentation/` in the same pull request and rebuild:
-
-```bash
-cd documentation && npm run build
-```
-
-See [`documentation/_how-to-update.md`](documentation/_how-to-update.md) for the
+change something, update `documentation/` in the same pull request. See
+[`documentation/_how-to-update.md`](documentation/_how-to-update.md) for the
 full regeneration manual, verification steps and troubleshooting.
 
 ## Method
