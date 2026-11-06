@@ -18,6 +18,22 @@ Rendered documentation site: <https://the-episerve-consortium.github.io/model__p
 The VitePress sources live in [`documentation/`](documentation/). GitHub also
 renders the Markdown pages directly, including the Mermaid diagrams.
 
+> [!WARNING]
+> The documentation is a committed snapshot and is **not regenerated when the
+> code changes**. CI only rebuilds the site when `documentation/**` changes; it
+> does not detect stale pages. If your change affects the model card, the
+> parameters, the input/output columns, an error message, or the architecture,
+> update `documentation/` in the same pull request.
+
+| If you change… | Update |
+|---|---|
+| `fdo.json`, parameter names, bounds or defaults | `01-getting-started/configuration.md`, `02-architecture/model-card-and-validation.md` |
+| Input or output columns, exit codes | `01-getting-started/container-contract.md` |
+| Axis handling, gap policy or error text | `02-architecture/series-handling.md`, `configuration.md` error catalogue |
+| The forecast statistic or interval | `02-architecture/null-forecast.md`, `overview.md` |
+| Resources (CPU, memory, network) | `overview.md`, `onboarding/executive-guide.md` |
+| Any code that moves cited lines | re-check the `file:line` citations in the affected pages |
+
 ## Method
 
 1. Take the history window defined by `history_length` and `prediction_offset`.
