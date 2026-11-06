@@ -24,6 +24,8 @@ Folder-specific context for the pytest suite. See the root `AGENTS.md`.
 ## Commands
 
 ```bash
-pytest tests/ -v
+ruff check src tests
+mypy src
+pytest tests/ -v --cov=src --cov-report=term-missing
 pytest tests/test_run.py -k "offset or string" -v
 ```

@@ -9,37 +9,131 @@ Generates:
 Relative links are rewritten to absolute site URLs for pages, and to GitHub
 blob URLs for repository files, so the served copies do not contain broken
 `../` paths.
+
+The repository and branch come from catalogue.json (`source.repo` and
+`source.branch`); the site URL is derived from the repository. Override them
+with REPO_URL, BRANCH and DOCS_SITE for a custom domain or a different remote.
+Pages are discovered from catalogue.json, with a filesystem fallback for pages
+that are not listed yet.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import posixpath
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent  # documentation/
-REPO = "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model"
-SITE = "https://the-episerve-consortium.github.io/model__prediction__generic__null-model"
-
-PAGES = [
-    ("Contributor Guide", "onboarding/contributor-guide.md"),
-    ("Staff Engineer Guide", "onboarding/staff-engineer-guide.md"),
-    ("Executive Guide", "onboarding/executive-guide.md"),
-    ("Product Manager Guide", "onboarding/product-manager-guide.md"),
-    ("Overview", "01-getting-started/overview.md"),
-    ("Container Contract", "01-getting-started/container-contract.md"),
-    ("Configuration", "01-getting-started/configuration.md"),
-    ("Local Development", "01-getting-started/local-development.md"),
-    ("Execution Pipeline", "02-architecture/execution-pipeline.md"),
-    ("Time Axis and Target Handling", "02-architecture/series-handling.md"),
-    ("The Null Forecast", "02-architecture/null-forecast.md"),
-    ("Model Card and Config Validation", "02-architecture/model-card-and-validation.md"),
-    ("Build Your Own Model", "03-template/build-your-own-model.md"),
-    ("Documentation Index", "index.md"),
-]
+CATALOGUE = ROOT / "catalogue.json"
+FALLBACK_REPO = "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model"
+FALLBACK_SITE = "https://the-episerve-consortium.github.io/model__prediction__generic__null-model"
 
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 FRONTMATTER = re.compile(r"^---\n.*?\n---\n", re.S)
+SKIP_FILES = {"AGENTS.md", "CLAUDE.md", "_how-to-update.md"}
+
+
+def git_remote() -> str | None:
+    """Return the origin remote as a GitHub HTTPS URL, when possible."""
+    try:
+        remote = subprocess.check_output(
+            ["git", "-C", str(ROOT.parent), "remote", "get-url", "origin"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    if remote.startswith("git@github.com:"):
+        path = remote[len("git@github.com:") :]
+    elif remote.startswith("ssh://git@github.com/"):
+        path = remote[len("ssh://git@github.com/") :]
+    elif remote.startswith("https://github.com/"):
+        path = remote[len("https://github.com/") :]
+    else:
+        return None
+    return f"https://github.com/{path.removesuffix('.git').rstrip('/')}"
+
+
+def catalogue_data() -> dict:
+    """Return catalogue.json as a dict, or an empty dict when missing."""
+    if not CATALOGUE.exists():
+        return {}
+    data = json.loads(CATALOGUE.read_text())
+    return data if isinstance(data, dict) else {}
+
+
+def catalogue_source() -> dict:
+    """Return the `source` block from catalogue.json, if present."""
+    source = catalogue_data().get("source", {})
+    return source if isinstance(source, dict) else {}
+
+
+def default_repo() -> str:
+    source = catalogue_source()
+    return (os.environ.get("REPO_URL") or source.get("repo") or git_remote() or FALLBACK_REPO).rstrip("/")
+
+
+def default_site(repo: str) -> str:
+    override = os.environ.get("DOCS_SITE")
+    if override:
+        return override.rstrip("/")
+    match = re.match(r"https://github\.com/([^/]+)/([^/]+)$", repo)
+    if match:
+        owner, name = match.group(1).lower(), match.group(2)
+        return f"https://{owner}.github.io/{name}"
+    return FALLBACK_SITE
+
+
+REPO = default_repo()
+SITE = default_site(REPO)
+BRANCH = os.environ.get("BRANCH") or catalogue_source().get("branch") or "main"
+TITLE = catalogue_data().get("title") or "Documentation"
+
+
+def discover_pages() -> list[tuple[str, str]]:
+    """Return (title, path) pairs in the order they should be inlined."""
+    pages: list[tuple[str, str]] = []
+
+    def add(item: dict) -> None:
+        path = item.get("path", "")
+        if path.endswith(".md"):
+            pages.append((item.get("title") or Path(path).stem.replace("-", " ").title(), path))
+        for child in item.get("children", []):
+            add(child)
+
+    if CATALOGUE.exists():
+        catalogue = catalogue_data()
+        for item in catalogue.get("onboarding", []):
+            add(item)
+        for section in catalogue.get("sections", []):
+            add(section)
+
+    known = {path for _, path in pages}
+    for file in sorted(ROOT.rglob("*.md")):
+        relative = file.relative_to(ROOT).as_posix()
+        if relative in known or file.name in SKIP_FILES:
+            continue
+        if any(part in {"node_modules", ".vitepress"} for part in file.parts):
+            continue
+        title = "Documentation Index" if relative == "index.md" else file.stem.replace("-", " ").title()
+        pages.append((title, relative))
+
+    # Keep the landing page last, and drop duplicates.
+    pages.sort(key=lambda item: item[1] == "index.md")
+    seen: set[str] = set()
+    unique: list[tuple[str, str]] = []
+    for title, path in pages:
+        if path not in seen:
+            seen.add(path)
+            unique.append((title, path))
+    return unique
+
+
+PAGES = discover_pages()
 
 
 def absolute(target: str, page_rel: str) -> str:
@@ -48,12 +142,15 @@ def absolute(target: str, page_rel: str) -> str:
         return target
     path, has_fragment, fragment = target.partition("#")
     resolved = posixpath.normpath(posixpath.join(posixpath.dirname(page_rel), path))
-    if resolved.startswith("..") or resolved in {"README.md", "fdo.json", "MODEL_TEMPLATE.md"}:
-        url = f"{REPO}/blob/main/{resolved}"
+    repo_path = resolved.startswith("../")
+    while resolved.startswith("../"):
+        resolved = resolved[3:]
+    if repo_path or resolved in {"README.md", "fdo.json", "MODEL_TEMPLATE.md"}:
+        url = f"{REPO}/blob/{BRANCH}/{resolved}"
     elif resolved.endswith(".md"):
         url = f"{SITE}/{resolved[:-3]}" if resolved != "index.md" else f"{SITE}/"
     else:
-        url = f"{REPO}/blob/main/documentation/{resolved}"
+        url = f"{REPO}/blob/{BRANCH}/documentation/{resolved}"
     return url + (f"#{fragment}" if has_fragment else "")
 
 
@@ -63,7 +160,7 @@ def rewrite_links(text: str, page_rel: str) -> str:
 
 def build_full() -> str:
     lines = [
-        "# model__prediction__generic__null-model — full documentation",
+        f"# {TITLE} — full documentation",
         "",
         "> Complete inlined content of the documentation pages, for LLM context windows.",
         "",
@@ -75,19 +172,8 @@ def build_full() -> str:
 
 
 def build_public_index() -> str:
-    text = (ROOT / "llms.txt").read_text()
-
-    def replace(match: re.Match[str]) -> str:
-        target = match.group(1)
-        if target.startswith(("http://", "https://", "mailto:", "#")):
-            return match.group(0)
-        if target.startswith("../"):
-            return f"]({REPO}/blob/main/{posixpath.normpath(target[3:])})"
-        if target == "catalogue.json":
-            return f"]({REPO}/blob/main/documentation/catalogue.json)"
-        return match.group(0)
-
-    return LINK.sub(replace, text)
+    """Rewrite llms.txt for serving from the site root."""
+    return rewrite_links((ROOT / "llms.txt").read_text(), "llms.txt")
 
 
 def main() -> None:
@@ -95,8 +181,10 @@ def main() -> None:
     (ROOT / "llms-full.txt").write_text(full)
     (ROOT / "public" / "llms-full.txt").write_text(full)
     (ROOT / "public" / "llms.txt").write_text(build_public_index())
+    print(f"repo: {REPO}")
+    print(f"site: {SITE}")
+    print(f"pages: {len(PAGES)}")
     print(f"llms-full: {len(full)} bytes")
-    print("wrote public/llms.txt and public/llms-full.txt")
 
 
 if __name__ == "__main__":

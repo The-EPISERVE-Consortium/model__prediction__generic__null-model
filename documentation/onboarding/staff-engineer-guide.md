@@ -61,8 +61,8 @@ clock. That is what makes the 83-test suite fast and deterministic
 
 Sources: [`src/model.py:27-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L116),
 [`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25),
-[`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68),
-[`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138).
+[`src/config_schema.py:38-72`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L72),
+[`README.md:164-172`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L164-L172).
 
 ## Pseudocode (TypeScript)
 
@@ -172,7 +172,7 @@ flowchart TD
     class A,B,C,D,E,F,G,H dark
 ```
 
-<!-- Sources: fdo.json:31-67, README.md:129-138 -->
+<!-- Sources: fdo.json:31-67, README.md:164-172 -->
 
 The boundary is deliberate: `statistic` is an enum, not a plugin point. A drift
 model or a seasonal-naive model changes the hypothesis and belongs in its own

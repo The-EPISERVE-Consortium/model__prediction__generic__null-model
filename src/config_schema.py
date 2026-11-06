@@ -57,7 +57,11 @@ def load_parameters(path: Path | None = None) -> dict:
         raise SchemaError(f"{path} is not valid JSON: {exc}") from exc
 
     parameters = card.get("episerve:parameters") if isinstance(card, dict) else None
-    if not isinstance(parameters, dict) or not isinstance(parameters.get("properties"), dict) or not parameters["properties"]:
+    if (
+        not isinstance(parameters, dict)
+        or not isinstance(parameters.get("properties"), dict)
+        or not parameters["properties"]
+    ):
         raise SchemaError(f"{path}: 'episerve:parameters' must be an object with a non-empty 'properties'")
 
     try:

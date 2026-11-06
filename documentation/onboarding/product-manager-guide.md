@@ -102,7 +102,7 @@ flowchart TD
 | String dates become positions | The output shows row numbers, not new labels |
 | Window choice matters | A different history length can change the result a lot |
 
-Sources: [`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138),
+Sources: [`README.md:164-172`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L164-L172),
 [`src/series.py:22-25`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L22-L25).
 
 The last one deserves emphasis: on one real benchmark, changing the history from

@@ -56,7 +56,9 @@ which makes it safe to run against an empty `work/input`.
 ## Tests
 
 ```bash
-pytest tests/ -v          # 83 tests
+ruff check src tests
+mypy src
+pytest tests/ -v --cov=src --cov-report=term-missing   # 83 tests
 pytest tests/test_model.py -v
 pytest tests/test_run.py::test_predictions_are_written_with_the_expected_values -v
 ```
@@ -145,7 +147,7 @@ Two design choices stand out:
 
 | Step | Command | Result |
 |---|---|---|
-| 1. Tests | `pytest tests/ -v` | 83 passed |
+| 1. Checks + tests | `ruff check src tests && mypy src && pytest tests/ -v --cov=src` | 83 passed, coverage ≥ 95% |
 | 2. Card | `episerve-validate fdo.json` | 0 errors |
 | 3. Image | `docker build -t … .` | local image |
 | 4. Publish | `git push origin main` | `:latest` on GHCR |

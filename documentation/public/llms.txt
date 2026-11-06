@@ -4,36 +4,36 @@
 
 ## Onboarding
 
-- [Contributor Guide](onboarding/contributor-guide.md): progressive path from Python basics to a first pull request.
-- [Staff Engineer Guide](onboarding/staff-engineer-guide.md): decision log, failure modes, tradeoffs.
-- [Executive Guide](onboarding/executive-guide.md): capability map, risk and cost.
-- [Product Manager Guide](onboarding/product-manager-guide.md): user journeys, limitations, FAQ.
+- [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide): progressive path from Python basics to a first pull request.
+- [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide): decision log, failure modes, tradeoffs.
+- [Executive Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/executive-guide): capability map, risk and cost.
+- [Product Manager Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/product-manager-guide): user journeys, limitations, FAQ.
 
 ## Architecture
 
-- [Execution Pipeline](02-architecture/execution-pipeline.md): main() step by step and every failure path.
-- [Time Axis and Target Handling](02-architecture/series-handling.md): datetime/timedelta/numeric/string axes and gap policy.
-- [The Null Forecast](02-architecture/null-forecast.md): point statistic, empirical quantiles, clamping.
-- [Model Card and Config Validation](02-architecture/model-card-and-validation.md): fdo.json as the source of truth.
+- [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline): main() step by step and every failure path.
+- [Time Axis and Target Handling](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/series-handling): datetime/timedelta/numeric/string axes and gap policy.
+- [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast): point statistic, empirical quantiles, clamping.
+- [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation): fdo.json as the source of truth.
 
 ## Getting Started
 
-- [Overview](01-getting-started/overview.md): purpose, flat forecast, benchmark role.
-- [Container Contract](01-getting-started/container-contract.md): /work input/output, exit codes, --check-config.
-- [Configuration](01-getting-started/configuration.md): the four parameters and their bounds.
-- [Local Development](01-getting-started/local-development.md): run, test, build, publish.
+- [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview): purpose, flat forecast, benchmark role.
+- [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract): /work input/output, exit codes, --check-config.
+- [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration): the four parameters and their bounds.
+- [Local Development](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/local-development): run, test, build, publish.
 
 ## Building a Model
 
-- [Build Your Own Model](03-template/build-your-own-model.md): keep the adapter, replace the core method.
+- [Build Your Own Model](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/03-template/build-your-own-model): keep the adapter, replace the core method.
 - [Agent brief](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/MODEL_TEMPLATE.md): file-by-file instructions and invariants for a coding agent.
 
 ## Deep Dive
 
-- [Execution Pipeline](02-architecture/execution-pipeline.md)
-- [Time Axis and Target Handling](02-architecture/series-handling.md)
-- [The Null Forecast](02-architecture/null-forecast.md)
-- [Model Card and Config Validation](02-architecture/model-card-and-validation.md)
+- [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline)
+- [Time Axis and Target Handling](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/series-handling)
+- [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast)
+- [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation)
 
 ## Optional
 

@@ -99,7 +99,7 @@ sequenceDiagram
 This is a **direct multi-step** forecast: the statistic is computed once from
 observed history and never updated with its own predictions. A recursive variant
 would append each forecast to the window and recompute; it is deliberately absent
-([`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138)).
+([`README.md:164-172`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L164-L172)).
 
 ### Direct vs recursive, concretely
 

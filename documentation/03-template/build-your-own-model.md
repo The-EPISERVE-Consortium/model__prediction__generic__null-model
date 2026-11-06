@@ -37,7 +37,7 @@ flowchart LR
     class R,C,S,M,O dark
 ```
 
-<!-- Sources: src/run.py:25-26, src/model.py:15, src/config_schema.py:98 -->
+<!-- Sources: src/run.py:25-26, src/model.py:15, src/config_schema.py:102 -->
 
 ## Keep / replace
 
@@ -187,7 +187,7 @@ flowchart LR
     class A,B,C,D,E dark
 ```
 
-<!-- Sources: fdo.json:31-67, src/config_schema.py:98-130 -->
+<!-- Sources: fdo.json:31-67, src/config_schema.py:102-134 -->
 
 For each new parameter, declare type, bounds, default and a description in
 `episerve:parameters`. If it is the horizon, history or offset, add it to
@@ -241,7 +241,7 @@ sequenceDiagram
     Dev->>CKAN: add qualifying run to a benchmark
 ```
 
-<!-- Sources: .github/workflows/publish.yml:17-83, README.md:120-127 -->
+<!-- Sources: .github/workflows/publish.yml:17-83, README.md:151-160 -->
 
 The first successful run is what creates the catalog entry; there is no manual
 registration step. A benchmark entry additionally requires the run's provenance
@@ -262,7 +262,7 @@ to show exactly the benchmark input at the pinned commit.
 
 Source: [`fdo.json:31-35`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L35),
 [`src/run.py:100-125`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L100-L125),
-[`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138).
+[`README.md:164-172`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L164-L172).
 
 ## Checklist
 
@@ -271,6 +271,7 @@ Source: [`fdo.json:31-35`](https://github.com/The-EPISERVE-Consortium/model__pre
 - [ ] Replace `src/model.py`, keep the signature and output schema.
 - [ ] Reuse `series.py` for axis and gaps.
 - [ ] Add core tests; keep CLI, series and card tests green.
+- [ ] Keep `ruff check src tests`, `mypy src` and coverage ≥ 95% green.
 - [ ] Update `documentation/` and `README.md`.
 - [ ] Build and run the container contract locally.
 - [ ] Publish `:latest` and a pinned tag.

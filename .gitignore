@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 work/
 output/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/

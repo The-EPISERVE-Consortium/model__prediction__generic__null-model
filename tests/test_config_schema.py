@@ -50,7 +50,10 @@ def test_card_bounds_match_model_constants():
 
 def test_card_max_horizon_matches_the_parameter_bound():
     card = json.loads((REPO_ROOT / "fdo.json").read_text())
-    assert card["episerve:task"]["maxHorizon"] == card["episerve:parameters"]["properties"]["prediction_length"]["maximum"]
+    assert (
+        card["episerve:task"]["maxHorizon"]
+        == card["episerve:parameters"]["properties"]["prediction_length"]["maximum"]
+    )
 
 
 def test_card_is_probabilistic_and_declares_quantiles():

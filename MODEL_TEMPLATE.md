@@ -77,7 +77,7 @@ Keep that boundary; it is what makes the model testable and portable.
    quantile ordering (`q10 <= point <= q90`), determinism, and edge cases
    (constant series, short window, NaN handling, max horizon).
 6. **Update the docs** under `documentation/` in the same change.
-7. **Verify locally:** `pytest tests/ -v`, `docker build`, `--check-config`.
+7. **Verify locally:** `ruff check src tests`, `mypy src`, `pytest tests/ -v --cov=src`, `docker build`, `--check-config`.
 8. **Publish:** push `main` for `:latest`, tag `vX.Y.Z` for a pinned image.
 9. **Register:** the first successful run through the model runner creates the
    CKAN entry; then add a qualifying run to a benchmark.
@@ -116,7 +116,8 @@ Keep that boundary; it is what makes the model testable and portable.
 
 ## Definition of done
 
-- [ ] `pytest tests/ -v` passes.
+- [ ] `ruff check src tests` and `mypy src` pass.
+- [ ] `pytest tests/ -v --cov=src` passes (coverage ≥ 95%).
 - [ ] `fdo.json` validates against the model-card spec.
 - [ ] `--check-config` accepts the example config and rejects unknown keys.
 - [ ] The image builds and runs the container contract end to end.

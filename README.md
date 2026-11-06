@@ -133,7 +133,9 @@ sections in the catalog), and the API checks a run's config against
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-test.txt
-pytest tests/ -v
+ruff check src tests
+mypy src
+pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
 Run the container contract locally:
@@ -148,9 +150,11 @@ docker run --rm -v $(pwd)/work/input:/work/input -v $(pwd)/work/output:/work/out
 
 ## Release
 
-Push to `main` → CI builds the image, runs the tests inside it and pushes
-`:latest` to GHCR. `git tag v0.1.0 && git push origin v0.1.0` also publishes
-the pinned `:v0.1.0` image.
+Push to `main` → CI builds the image, runs lint, type checks and tests inside
+it, and pushes `:latest` to GHCR. `git tag v0.1.0 && git push origin v0.1.0`
+also publishes the pinned `:v0.1.0` image. `:latest` follows `main` on
+non-docs changes; a `vX.Y.Z` tag pins an image for that release. Docs-only
+changes do not rebuild the image.
 
 The model is registered in CKAN automatically after its first run through the
 model runner; no manual catalog entry is needed.

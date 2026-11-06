@@ -85,6 +85,12 @@ npm run preview      # http://localhost:4173, base "/"
 the real subpath, serve `documentation/.vitepress/dist` under
 `/model__prediction__generic__null-model/` with any static server.
 
+`scripts/build_llms.py` reads the repository and branch from `catalogue.json`
+(`source.repo`, `source.branch`) and derives the site URL from the repository.
+Set `REPO_URL`, `BRANCH` or `DOCS_SITE` for a custom domain or a different
+remote. It discovers pages from `catalogue.json` and appends any unlisted
+content page from the filesystem.
+
 ## After a full regeneration
 
 Deep Wiki rewrites most pages. Re-apply these manual corrections before

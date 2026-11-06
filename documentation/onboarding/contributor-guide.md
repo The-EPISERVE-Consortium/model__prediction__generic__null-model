@@ -56,7 +56,7 @@ Two ideas make the rest of the codebase legible:
    `fdo.json` and are enforced through `jsonschema`; a few structural constants
    (`MIN_CONTEXT`, `MAX_PREDICTION_STEPS`) are mirrored in the card and checked
    by the tests
-   ([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
+   ([`src/config_schema.py:38-72`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L72)).
 
 ## Part II — The four modules
 
@@ -88,7 +88,7 @@ classDiagram
 | Module | You touch it when… | Read first |
 |---|---|---|
 | `src/run.py` | changing I/O, error messages, window selection | [`run.py:47-148`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47-L148) |
-| `src/config_schema.py` | adding/renaming a parameter, changing validation text | [`config_schema.py:98-130`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L98-L130) |
+| `src/config_schema.py` | adding/renaming a parameter, changing validation text | [`config_schema.py:102-134`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L102-L134) |
 | `src/series.py` | supporting a new axis kind or gap policy | [`series.py:136-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136-L257) |
 | `src/model.py` | changing the forecast statistic or interval | [`model.py:27-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L27-L116) |
 
@@ -131,7 +131,7 @@ You should see 83 passing tests in a few seconds.
 ### Your first task: change a message
 
 A good first change is improving one error message in `_describe`
-([`src/config_schema.py:71-95`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L71-L95)).
+([`src/config_schema.py:75-99`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L75-L99)).
 The loop is:
 
 ```mermaid
@@ -149,7 +149,7 @@ sequenceDiagram
     You->>You: commit + push + PR
 ```
 
-<!-- Sources: tests/test_config_schema.py:96-135, src/config_schema.py:71-95 -->
+<!-- Sources: tests/test_config_schema.py:99-138, src/config_schema.py:75-99 -->
 
 ### Adding a parameter (the full checklist)
 
@@ -174,9 +174,9 @@ flowchart LR
     class A,B,C,D,E dark
 ```
 
-<!-- Sources: fdo.json:31-67, src/run.py:84-87, tests/test_config_schema.py:22-60 -->
+<!-- Sources: fdo.json:31-67, src/run.py:84-87, tests/test_config_schema.py:22-63 -->
 
-`tests/test_config_schema.py:22-60` is the guard that keeps the card and the
+`tests/test_config_schema.py:22-63` is the guard that keeps the card and the
 Python constants in sync; if you add a bound, add it there too.
 
 ### Testing strategy
@@ -187,9 +187,11 @@ Python constants in sync; if you add a bound, add it there too.
 | Card/validator | `test_config_schema.py` | parameterised bad configs |
 | CLI end-to-end | `test_run.py` | temp `WORK_DIR`, call `main()`, read TSV |
 
-Run one test while iterating:
+Run the static checks and one test while iterating:
 
 ```bash
+ruff check src tests
+mypy src
 pytest tests/test_model.py::test_quantiles_are_empirical_quantiles_of_the_window -v
 ```
 
@@ -218,7 +220,7 @@ pytest tests/test_model.py::test_quantiles_are_empirical_quantiles_of_the_window
 
 1. Branch from `main`.
 2. Make the smallest change that satisfies the card.
-3. `pytest tests/ -v` — all green.
+3. `ruff check src tests`, `mypy src`, `pytest tests/ -v --cov=src` — all green.
 4. `episerve-validate fdo.json` if the card changed.
 5. Open a PR; CI runs the card check and the in-image tests.
 6. Merge; `main` publishes `:latest` automatically.
@@ -246,7 +248,7 @@ stateDiagram-v2
 | `src/run.py` | 152 | orchestration and error contract |
 | `src/series.py` | 257 | axis and gap edge cases |
 | `src/model.py` | 116 | forecast arithmetic |
-| `src/config_schema.py` | 130 | validation and messages |
+| `src/config_schema.py` | 134 | validation and messages |
 | `fdo.json` | 128 | the contract |
 | `tests/test_run.py` | 232 | end-to-end expectations |
 

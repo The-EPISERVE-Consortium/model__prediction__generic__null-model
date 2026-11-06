@@ -24,7 +24,7 @@
         {
           "title": "Configuration",
           "path": "01-getting-started/configuration.md",
-          "prompt": "Document history_length, prediction_length, prediction_offset and statistic, their bounds and defaults, and the cross-field rule. Cite fdo.json:31-67 and src/config_schema.py:98-130."
+          "prompt": "Document history_length, prediction_length, prediction_offset and statistic, their bounds and defaults, and the cross-field rule. Cite fdo.json:31-67 and src/config_schema.py:102-134."
         },
         {
           "title": "Local Development",
@@ -56,7 +56,7 @@
         {
           "title": "Model Card and Config Validation",
           "path": "02-architecture/model-card-and-validation.md",
-          "prompt": "Explain how fdo.json drives validation through jsonschema, how defaults are filled, and how the card is validated in CI. Cite fdo.json, src/config_schema.py:38-130 and .github/workflows/publish.yml:18-24."
+          "prompt": "Explain how fdo.json drives validation through jsonschema, how defaults are filled, and how the card is validated in CI. Cite fdo.json, src/config_schema.py:38-134 and .github/workflows/publish.yml:18-24."
         }
       ]
     },

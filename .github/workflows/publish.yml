@@ -68,7 +68,7 @@ jobs:
             --workdir /app \
             --entrypoint sh \
             episerve-model:ci \
-            -c "pip install --no-cache-dir -r requirements-test.txt && python -m pytest tests/ -v"
+            -c "pip install --no-cache-dir -r requirements-test.txt && ruff check src tests && mypy src && python -m pytest tests/ -v --cov=src --cov-report=term-missing"
 
       - name: Push image (branch push -> latest)
         if: github.event_name == 'push' && github.ref_type == 'branch'

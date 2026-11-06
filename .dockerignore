@@ -5,3 +5,10 @@
 __pycache__
 work
 output
+documentation/node_modules
+documentation/.vitepress/dist
+documentation/.vitepress/cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache

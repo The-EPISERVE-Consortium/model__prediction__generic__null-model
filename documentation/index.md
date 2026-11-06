@@ -123,7 +123,7 @@ flowchart TD
 | File | Responsibility | Source |
 |---|---|---|
 | `src/run.py` | Container entry point, I/O, window selection, exit codes | [`src/run.py:47`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L47) |
-| `src/config_schema.py` | Loads `episerve:parameters` from the card and validates `config.json` | [`src/config_schema.py:98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L98) |
+| `src/config_schema.py` | Loads `episerve:parameters` from the card and validates `config.json` | [`src/config_schema.py:102`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L102) |
 | `src/series.py` | X-axis extrapolation and target gap handling | [`src/series.py:136`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L136) |
 | `src/model.py` | Point statistic, empirical quantiles, output frame | [`src/model.py:49`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49) |
 | `fdo.json` | Model card: parameters, I/O, resources, documentation | [`fdo.json:31`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31) |

@@ -79,7 +79,7 @@ Three consequences follow directly from that definition:
    ([`src/model.py:7-9`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L7-L9)).
 3. **It is a direct multi-step forecast.** Forecasts are never fed back into the
    window; a recursive (sliding-window) variant is deliberately not implemented
-   ([`README.md:129-138`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L129-L138)).
+   ([`README.md:164-172`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md#L164-L172)).
 
 ## The forecast horizon
 

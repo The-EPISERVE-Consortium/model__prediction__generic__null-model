@@ -9,8 +9,8 @@ Both are independent of the forecast statistic, so they live here rather than
 in :mod:`model`.
 """
 
-from datetime import date
 import warnings
+from datetime import date
 
 import numpy as np
 import pandas as pd

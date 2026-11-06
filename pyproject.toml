@@ -1,0 +1,28 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests put src/ on sys.path before importing the modules.
+"tests/*" = ["E402", "I001"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+# run.py is exercised through subprocesses in tests/test_run.py, so coverage
+# cannot observe it; the CLI is still covered by the end-to-end tests.
+omit = ["src/run.py"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true

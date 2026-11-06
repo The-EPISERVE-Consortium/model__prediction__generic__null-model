@@ -24,7 +24,7 @@ python scripts/build_llms.py   # refresh llms-full.txt and public/llms*.txt
 | `03-template/` | build-your-own-model guide |
 | `onboarding/` | contributor, staff, executive, PM guides |
 | `_how-to-update.md` | maintainer manual for regenerating the docs |
-| `scripts/build_llms.py` | regenerates `llms-full.txt` and the public LLM copies |
+| `scripts/build_llms.py` | regenerates the LLM copies; URLs from `catalogue.json`, pages from the catalogue/filesystem |
 | `scripts/check_mermaid.mjs` | parses every Mermaid block |
 | `catalogue.json` | machine-readable structure (sections + prompts) |
 | `llms.txt` | wiki-relative LLM index |

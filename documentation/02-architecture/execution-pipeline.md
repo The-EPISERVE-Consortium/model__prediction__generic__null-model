@@ -167,7 +167,7 @@ classDiagram
     model --> series
 ```
 
-<!-- Sources: src/run.py:25-26, src/model.py:15, src/config_schema.py:38-130 -->
+<!-- Sources: src/run.py:25-26, src/model.py:15, src/config_schema.py:38-134 -->
 
 ## Why this order
 

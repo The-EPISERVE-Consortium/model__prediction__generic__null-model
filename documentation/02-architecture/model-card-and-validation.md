@@ -16,7 +16,7 @@ are declared once in `fdo.json`, the **model card**, which follows the
 The card is not documentation that happens to be machine-readable; it is the
 input to the validator. `config_schema.py` loads `episerve:parameters` from the
 card and hands it to `jsonschema`
-([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
+([`src/config_schema.py:38-72`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L72)).
 Changing a bound in the card changes what the API server accepts, what
 `--check-config` accepts, and what the tests assert — without touching Python
 logic.
@@ -55,7 +55,7 @@ sequenceDiagram
     end
 ```
 
-<!-- Sources: src/config_schema.py:38-130 -->
+<!-- Sources: src/config_schema.py:38-134 -->
 
 The two error classes are deliberately distinct:
 
@@ -119,7 +119,7 @@ Two details are worth calling out:
 
 `_describe` maps `jsonschema` error objects to one-line messages keyed by the
 offending parameter
-([`src/config_schema.py:71-95`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L71-L95)):
+([`src/config_schema.py:75-99`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L75-L99)):
 
 ```mermaid
 flowchart TD
@@ -143,11 +143,11 @@ flowchart TD
     class E,V,R,A,T,M,X,N,O,S dark
 ```
 
-<!-- Sources: src/config_schema.py:71-95 -->
+<!-- Sources: src/config_schema.py:75-99 -->
 
 Errors are sorted by path so that two runs with the same bad config produce the
 same output order
-([`src/config_schema.py:117-121`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L117-L121)).
+([`src/config_schema.py:121-125`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L121-L125)).
 That is what makes the CLI output testable.
 
 ## Defaults
@@ -167,12 +167,12 @@ flowchart LR
     class A,B,C,D,E,F,G dark
 ```
 
-<!-- Sources: src/config_schema.py:123-130 -->
+<!-- Sources: src/config_schema.py:127-134 -->
 
 `resolved` always contains every declared key that has a value or a default. For
 this card, a minimal `{"history_length": 3, "prediction_length": 1}` resolves to
 all four keys, with `prediction_offset=0` and `statistic="mean"`
-([`tests/test_config_schema.py:65-74`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_config_schema.py#L65-L74)).
+([`tests/test_config_schema.py:68-77`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/tests/test_config_schema.py#L68-L77)).
 
 ## Card validation in CI
 

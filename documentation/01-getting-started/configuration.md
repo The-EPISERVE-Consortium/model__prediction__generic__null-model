@@ -71,7 +71,7 @@ sequenceDiagram
     end
 ```
 
-<!-- Sources: src/config_schema.py:98-130, src/run.py:74-87, src/run.py:113-119 -->
+<!-- Sources: src/config_schema.py:102-134, src/run.py:74-87, src/run.py:113-119 -->
 
 The two-stage check is deliberate: the per-key schema runs before any data
 exists (API server, `--check-config`), and the cross-field rule runs inside the
@@ -111,7 +111,7 @@ quantiles of the same window
 ## Defaults and unknown keys
 
 Optional keys are filled from the card's `default` before the model sees them
-([`src/config_schema.py:123-130`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L123-L130)).
+([`src/config_schema.py:127-134`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L127-L134)).
 Unknown keys are rejected together, not one at a time:
 
 ```json
@@ -122,18 +122,18 @@ Unknown keys are rejected together, not one at a time:
 ERROR: config.json has unrecognised key(s): 'horizon'
 ```
 
-Source: [`src/config_schema.py:80-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L80-L82).
+Source: [`src/config_schema.py:84-86`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L84-L86).
 
 ## Error message catalogue
 
 | Condition | Message shape | Source |
 |---|---|---|
-| Missing key | `config.json missing required key: '<name>'` | [`config_schema.py:77-79`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L77-L79) |
-| Wrong type | `config.json key '<k>' must be a <type>` | [`config_schema.py:85-87`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L85-L87) |
-| Below minimum | `config.json key '<k>' must be >= <n>` | [`config_schema.py:88-89`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L88-L89) |
-| Above maximum | `config.json key '<k>' must be <= <n>` | [`config_schema.py:90-91`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L90-L91) |
-| Bad enum | `config.json key '<k>' must be one of 'mean', 'median', 'last'` | [`config_schema.py:92-94`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L92-L94) |
-| Unknown key | `config.json has unrecognised key(s): 'x', 'y'` | [`config_schema.py:80-82`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L80-L82) |
+| Missing key | `config.json missing required key: '<name>'` | [`config_schema.py:81-83`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L81-L83) |
+| Wrong type | `config.json key '<k>' must be a <type>` | [`config_schema.py:89-91`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L89-L91) |
+| Below minimum | `config.json key '<k>' must be >= <n>` | [`config_schema.py:92-93`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L92-L93) |
+| Above maximum | `config.json key '<k>' must be <= <n>` | [`config_schema.py:94-95`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L94-L95) |
+| Bad enum | `config.json key '<k>' must be one of 'mean', 'median', 'last'` | [`config_schema.py:96-98`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L96-L98) |
+| Unknown key | `config.json has unrecognised key(s): 'x', 'y'` | [`config_schema.py:84-86`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L84-L86) |
 | Too little data | `not enough input data: ... has only N rows` | [`run.py:113-119`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L113-L119) |
 
 ## Worked examples
