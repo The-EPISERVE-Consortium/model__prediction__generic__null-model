@@ -1,0 +1,4 @@
+pandas
+pyarrow
+numpy
+jsonschema>=4.18

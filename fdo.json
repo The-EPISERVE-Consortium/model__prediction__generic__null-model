@@ -1,0 +1,128 @@
+{
+  "@context": [
+    "https://schema.org/",
+    { "episerve": "https://api.episerve.zib.de/schemas/model-card/v1#" }
+  ],
+  "@type": "SoftwareApplication",
+  "conformsTo": "https://api.episerve.zib.de/schemas/model-card/v1.json",
+  "name": "model__prediction__generic__null-model",
+  "description": "Null model: repeats the mean, median or last value of the history window and takes its 10th and 90th percentiles as the forecast interval.",
+  "url": "ghcr.io/the-episerve-consortium/model__prediction__generic__null-model",
+  "codeRepository": "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model",
+  "license": "MIT",
+  "applicationCategory": "algorithm",
+  "operatingSystem": "Linux",
+  "runtimePlatform": "Docker",
+  "author": { "@type": "Organization", "name": "EPISERVE Consortium" },
+
+  "episerve:task": {
+    "type": "forecast",
+    "frequency": "any",
+    "probabilistic": true,
+    "covariates": false,
+    "maxHorizon": 512,
+    "parameterRoles": {
+      "horizon": "prediction_length",
+      "history": "history_length",
+      "offset": "prediction_offset"
+    }
+  },
+
+  "episerve:parameters": {
+    "type": "object",
+    "required": ["history_length", "prediction_length"],
+    "additionalProperties": false,
+    "properties": {
+      "history_length": {
+        "type": "integer",
+        "minimum": 3,
+        "unit": "steps",
+        "description": "Number of rows in the history window whose statistic is repeated. The window ends at total_rows - prediction_offset."
+      },
+      "prediction_length": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 512,
+        "unit": "steps",
+        "description": "Number of steps to forecast ahead."
+      },
+      "prediction_offset": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "unit": "steps",
+        "description": "Rows to skip at the end of the input before the history window. Use for back-testing against known data."
+      },
+      "statistic": {
+        "type": "string",
+        "enum": ["mean", "median", "last"],
+        "default": "mean",
+        "description": "Statistic of the history window that is repeated over the forecast horizon."
+      }
+    },
+    "rules": [
+      "history_length + prediction_offset must not exceed the number of rows of input.parquet.",
+      "The 10th and 90th percentiles are taken from the same history window as the point forecast."
+    ]
+  },
+
+  "episerve:inputs": [
+    {
+      "file": "input.parquet",
+      "format": "application/vnd.apache.parquet",
+      "description": "Time axis first, target second; any further columns are ignored. Column names are free and the first two are kept in the output.",
+      "minRows": 3,
+      "additionalColumns": true,
+      "columns": [
+        {
+          "position": 0,
+          "role": "time",
+          "type": ["date", "datetime", "isoWeek", "integer", "number", "string"],
+          "description": "Unique, increasing, evenly spaced x values. Datetime, numeric and timedelta axes are extrapolated by their step; a string axis is continued as row positions."
+        },
+        {
+          "position": 1,
+          "role": "target",
+          "type": "number",
+          "nullable": true,
+          "description": "The series to forecast. Interior gaps of up to 8 rows are interpolated linearly, longer interior gaps are rejected; gaps at the ends are filled from the nearest value."
+        }
+      ]
+    }
+  ],
+
+  "episerve:outputs": [
+    {
+      "file": "predictions.tsv",
+      "format": "text/tab-separated-values",
+      "description": "One row per forecast step.",
+      "columns": [
+        { "nameFrom": { "inputRole": "time" }, "role": "time" },
+        { "name": "x_auto_converted", "role": "other", "type": "integer", "required": false,
+          "description": "Only when the x column holds strings: the step's 1-indexed row position in the input file." },
+        { "nameFrom": { "inputRole": "target" }, "role": "point", "type": "number",
+          "description": "The repeated statistic of the history window." },
+        { "nameFrom": { "inputRole": "target", "suffix": "_q10" }, "role": "quantile", "level": 0.1, "type": "number" },
+        { "nameFrom": { "inputRole": "target", "suffix": "_q90" }, "role": "quantile", "level": 0.9, "type": "number" }
+      ]
+    }
+  ],
+
+  "episerve:resources": {
+    "cpu": "250m",
+    "memory": "256Mi",
+    "gpu": 0,
+    "network": false,
+    "typicalRuntimeSeconds": 5
+  },
+
+  "episerve:documentation": {
+    "method": "Repeats a statistic of the history window (mean, median or last value) over the forecast horizon. The 10th and 90th percentiles are the empirical quantiles of the same window, clamped so that the point forecast lies inside the interval; a constant window gives q10 = q90 = point.",
+    "intendedUse": "Performance floor on benchmarks and a fast end-to-end check of the model-runner pipeline.",
+    "limitations": "No trend, seasonality or covariates, and one series per run. The interval reflects the spread of the history window, not forecast uncertainty. A string time axis is continued as row positions rather than labels.",
+    "trainingData": "Not trained; the model has no parameters and downloads no weights.",
+    "references": [
+      "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model"
+    ]
+  }
+}
