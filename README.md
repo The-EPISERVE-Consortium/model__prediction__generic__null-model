@@ -18,22 +18,14 @@ Rendered documentation site: <https://the-episerve-consortium.github.io/model__p
 The VitePress sources live in [`documentation/`](documentation/). GitHub also
 renders the Markdown pages directly, including the Mermaid diagrams.
 
-> [!WARNING]
-> The documentation is a committed snapshot and is **not regenerated when the
-> code changes**. If you change the model card, a parameter, the input/output
-> contract, an error message or the architecture, update `documentation/` in the
-> same pull request. To regenerate the pages with the Deep Wiki skill instead of
-> editing them by hand, run:
->
-> ```text
-> /skill:deep-wiki generate
-> ```
->
-> Review the diff before committing, then rebuild the site:
->
-> ```bash
-> cd documentation && npm run build
-> ```
+The documentation is a committed snapshot, not generated from the code. If you
+change the model card, parameters, I/O, errors or architecture, update
+`documentation/` in the same pull request. Regenerate with
+`/skill:deep-wiki generate`, review the diff, then rebuild:
+
+```bash
+cd documentation && npm run build
+```
 
 ## Method
 
