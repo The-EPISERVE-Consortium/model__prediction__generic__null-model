@@ -1,9 +1,10 @@
 # model__prediction__generic__null-model
 
 A deliberately simple forecast model for the EPISERVE platform: it repeats one
-statistic of the history window over the forecast horizon. It is the
-performance floor on a benchmark and a fast end-to-end check of the
-model-runner pipeline.
+statistic of the history window over the forecast horizon. The forecast is
+**flat by design** — every step gets the same point and the same interval, and
+only the time axis changes. It is the performance floor on a benchmark and a
+fast end-to-end check of the model-runner pipeline.
 
 No training, no weights, no network access, no GPU.
 
@@ -15,7 +16,10 @@ No training, no weights, no network access, no GPU.
 1. Take the history window defined by `history_length` and `prediction_offset`.
 2. Compute the requested statistic of the target column: `mean`, `median` or
    `last`.
-3. Repeat it for every forecast step.
+3. Repeat it for every forecast step. This is a **direct multi-step** forecast:
+   the statistic is computed once from the observed history, and previous
+   forecasts are never fed back into the window. Every output row therefore
+   carries the same point and the same q10/q90; only the time axis changes.
 4. Use the empirical 10th and 90th percentiles of the same window as the
    interval, clamped so that the point forecast lies inside it. A constant
    window therefore gives `q10 = q90 = point`.
@@ -124,6 +128,10 @@ model runner; no manual catalog entry is needed.
 
 ## Limitations
 
+- The forecast is constant over the horizon: a direct multi-step baseline, not
+  a recursive one-step-ahead (sliding-window) forecaster. Feeding each
+  prediction back into the window would only damp the last difference and
+  converge to a level; it is not implemented.
 - No trend, seasonality or covariates, and one series per run.
 - The interval describes the spread of the history window, not forecast
   uncertainty.
