@@ -63,10 +63,10 @@ pytest tests/test_run.py::test_predictions_are_written_with_the_expected_values 
 
 | File | What it locks down | Tests |
 |---|---|---|
-| `tests/test_config_schema.py` | Card/model agreement, defaults, error text | 17 |
-| `tests/test_model.py` | Point statistics, quantiles, clamping, axis output | 18 |
+| `tests/test_config_schema.py` | Card/model agreement, defaults, error text | 27 |
+| `tests/test_model.py` | Point statistics, quantiles, clamping, axis output | 19 |
 | `tests/test_series.py` | Axis kinds, uniform step, DST, gap policy | 22 |
-| `tests/test_run.py` | Full CLI: config, data errors, TSV output | 26 |
+| `tests/test_run.py` | Full CLI: config, data errors, TSV output | 15 |
 
 Source: [`tests/`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/tree/main/tests).
 

@@ -53,6 +53,7 @@ export default withMermaid(
       nav: [
         { text: 'Getting Started', link: '/01-getting-started/overview' },
         { text: 'Deep Dive', link: '/02-architecture/execution-pipeline' },
+        { text: 'Build a Model', link: '/03-template/build-your-own-model' },
         { text: 'Onboarding', link: '/onboarding/contributor-guide' },
         { text: 'Source', link: REPO },
       ],

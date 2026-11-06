@@ -10,8 +10,8 @@ description: Use this repository as a template for a new EPISERVE model — what
 Most of an EPISERVE model is not the model. It is the adapter between the
 platform and a forecasting method: reading `/work`, validating the card,
 slicing the history window, extrapolating the time axis, filling gaps, writing
-the TSV, and passing CI. This repository implements that adapter in about 650
-lines and keeps the actual forecast in one small module
+the TSV, and passing CI. This repository implements that adapter in about 540
+lines and keeps the actual forecast in one small module (116 lines)
 ([`src/model.py:49-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49-L116)).
 
 That split is the template: **keep the adapter, replace the core**. A more
@@ -69,10 +69,15 @@ def forecast(
     x_series: pd.Series,      # history x, already sliced
     y_series: pd.Series,      # history target, may contain NaN
     prediction_length: int,   # H
+    row_offset: int = 0,      # absolute row index of the first history row
     **parameters,             # declared in fdo.json
 ) -> pd.DataFrame:
     ...
 ```
+
+`row_offset` is the absolute row index of the first history row. Pass it to
+`future_values` for a string axis, so `x_auto_converted` is absolute in the
+input file rather than relative to the window.
 
 and this output
 ([`src/model.py:103-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L103-L114)):
@@ -80,7 +85,7 @@ and this output
 | Column | Required | Meaning |
 |---|---|---|
 | `<x>` (input name) | yes | Future time value |
-| `x_auto_converted` | only string axis | 1-indexed absolute row position |
+| `x_auto_converted` | only string axis | 1-indexed absolute row position (uses `row_offset`) |
 | `<y>` (input name) | yes | Point forecast |
 | `<y>_q10` | yes | Lower quantile |
 | `<y>_q90` | yes | Upper quantile |
@@ -121,13 +126,15 @@ Source: [`fdo.json:94-108`](https://github.com/The-EPISERVE-Consortium/model__pr
 ## Swapping in a sophisticated method
 
 A realistic replacement keeps the interface and moves all complexity behind it.
-The example below is a gradient-boosted, recursive one-step model; the point is
-the shape, not the algorithm:
+The example below is pseudocode for a gradient-boosted, recursive one-step model;
+the point is the shape, not the algorithm:
 
 ```python
-def forecast(x_series, y_series, prediction_length, **params):
+def forecast(x_series, y_series, prediction_length, row_offset=0, **params):
     values = prepare_target(y_series)          # reuse series.py
     future, positional = future_values(x_series, prediction_length)
+    if positional:
+        future = [value + row_offset for value in future]
 
     model = load_booster(params["model_path"])  # baked into the image
     history = list(values)

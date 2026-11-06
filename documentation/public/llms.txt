@@ -26,7 +26,7 @@
 ## Building a Model
 
 - [Build Your Own Model](03-template/build-your-own-model.md): keep the adapter, replace the core method.
-- [Agent brief](../MODEL_TEMPLATE.md): file-by-file instructions and invariants for a coding agent.
+- [Agent brief](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/MODEL_TEMPLATE.md): file-by-file instructions and invariants for a coding agent.
 
 ## Deep Dive
 
@@ -37,6 +37,6 @@
 
 ## Optional
 
-- [Repository README](../README.md): install, run, release.
-- [Model card](../fdo.json): machine-readable contract.
-- [Catalogue](catalogue.json): machine-readable wiki structure.
+- [Repository README](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/README.md): install, run, release.
+- [Model card](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json): machine-readable contract.
+- [Catalogue](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/documentation/catalogue.json): machine-readable wiki structure.

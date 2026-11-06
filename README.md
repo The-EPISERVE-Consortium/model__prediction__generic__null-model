@@ -24,7 +24,7 @@ and replace the core:
 | `Dockerfile`, CI, contract tests | `fdo.json` — parameters, I/O, resources |
 | `documentation/` structure | the pages describing the method |
 
-The core must stay a pure `forecast(x, y, prediction_length, **params)` that
+The core must stay a pure `forecast(x, y, prediction_length, row_offset=0, **params)` that
 returns one row per step with a point and q10/q90. Read
 [Build Your Own Model](documentation/03-template/build-your-own-model.md) for the
 full guide, or [`MODEL_TEMPLATE.md`](MODEL_TEMPLATE.md) for the agent brief.

@@ -50,7 +50,7 @@ clock. That is what makes the 83-test suite fast and deterministic
 
 | # | Decision | Alternative rejected | Why |
 |---|---|---|---|
-| 1 | Flat direct forecast | Recursive sliding window | Recursion only damps the last difference; worse on the benchmark |
+| 1 | Flat direct forecast | Recursive sliding window | Recursion only damps the last difference; worse at the chosen 34-week window (13,340 vs 8,866) |
 | 2 | Empirical q10/q90 | Parametric normal interval | No distributional assumption; honest for skewed windows |
 | 3 | Clamp point into interval | Report incoherent interval | A point outside its own interval is unusable for scoring |
 | 4 | Card-driven JSON Schema | Python constants + docs | One source of truth for API, CLI and tests |
@@ -152,7 +152,7 @@ the problem is the platform, not the model.
 | First two columns only | Works with any benchmark schema | Cannot use named covariates |
 | Card as schema | One contract, no drift | Card edits need care |
 | No pinned deps | Simple requirements | Reproducibility risk (acknowledged in README) |
-| No recursive mode | Simpler, better on benchmark | Cannot express momentum |
+| No recursive mode | Simpler; better at the chosen window | Cannot express momentum |
 | String → positions | Handles ISO weeks | Output labels are not real dates |
 
 ## When to extend

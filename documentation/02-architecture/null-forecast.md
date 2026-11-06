@@ -105,14 +105,17 @@ would append each forecast to the window and recompute; it is deliberately absen
 
 For `k=2`, a recursive mean would produce
 `f_h = y_n - (y_n - y_{n-1}) / 2^h`: the last difference is halved at every step,
-so the path converges to `y_n` rather than following a trend. On the AMELAG
-benchmark that made the forecast worse, not better (MAE 14,960 vs 8,866 for the
-flat 34-week mean). The flat model is both simpler and, on that window, more
-accurate.
+so the path converges to `y_n` rather than following a trend. On AMELAG, at the
+same 34-week window the recursive mean is clearly worse (MAE 13,340 vs 8,866 for
+the flat mean). With a 2-week window it is marginally better than the flat
+2-week mean (14,960 vs 15,222), but both are far from the 34-week flat result.
+The flat model is simpler and, at the window that matters here, more accurate.
 
 | Variant | h=1 | h=2 | h=3 | Limit | Benchmark MAE |
 |---|---|---|---|---|---|
 | Flat mean k=34 | 14,029 | 14,029 | 14,029 | 14,029 | **8,866** |
+| Recursive mean k=34 | 14,029 | 10,671 | 9,518 | 10,569 | 13,340 |
+| Flat mean k=2 | 3,411 | 3,411 | 3,411 | 3,411 | 15,222 |
 | Recursive mean k=2 | 3,411 | 3,839 | 3,625 | 4,267 | 14,960 |
 
 Source: offline replay of the benchmark input; see the

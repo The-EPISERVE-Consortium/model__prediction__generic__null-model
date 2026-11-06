@@ -1,3 +1,8 @@
+---
+title: Documentation
+description: "Entry point for the null model documentation: quick start, architecture, guides and the template path."
+---
+
 # model__prediction__generic__null-model
 
 A dataset-agnostic **null forecaster** for the EPISERVE platform. It reads a time
@@ -140,5 +145,6 @@ flowchart TD
 
 - **First contact** → [Overview](./01-getting-started/overview.md) → [Container Contract](./01-getting-started/container-contract.md) → [Configuration](./01-getting-started/configuration.md)
 - **Changing the code** → [Execution Pipeline](./02-architecture/execution-pipeline.md) → [The Null Forecast](./02-architecture/null-forecast.md) → [Contributor Guide](./onboarding/contributor-guide.md)
+- **Reusing this as a template** → [Build Your Own Model](./03-template/build-your-own-model.md) → [`MODEL_TEMPLATE.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/MODEL_TEMPLATE.md)
 - **Reviewing the design** → [Staff Engineer Guide](./onboarding/staff-engineer-guide.md) → [Model Card and Config Validation](./02-architecture/model-card-and-validation.md)
 - **Non-engineering** → [Product Manager Guide](./onboarding/product-manager-guide.md) → [Executive Guide](./onboarding/executive-guide.md)

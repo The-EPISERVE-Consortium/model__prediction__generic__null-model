@@ -52,8 +52,10 @@ Two ideas make the rest of the codebase legible:
 1. **The window is the model.** Everything before `forecast()` exists to turn
    files into two clean `Series`; everything after exists to turn one number into
    a TSV ([`src/run.py:121-145`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L121-L145)).
-2. **The card is the contract.** Parameter bounds are not in Python constants
-   first; they are in `fdo.json` and enforced through `jsonschema`
+2. **The card is the contract.** User-facing parameter bounds live in
+   `fdo.json` and are enforced through `jsonschema`; a few structural constants
+   (`MIN_CONTEXT`, `MAX_PREDICTION_STEPS`) are mirrored in the card and checked
+   by the tests
    ([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
 
 ## Part II — The four modules

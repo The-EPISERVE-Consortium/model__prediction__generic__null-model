@@ -62,6 +62,7 @@ Important:
 cd documentation
 npm ci
 npm run build
+python scripts/build_llms.py    # regenerates llms-full.txt and the public copies
 ```
 
 The build fails on dead internal links. Also check:
@@ -82,6 +83,24 @@ npm run preview      # http://localhost:4173, base "/"
 `vitepress preview` serves at `/`, even when the build used a Pages base. To test
 the real subpath, serve `documentation/.vitepress/dist` under
 `/model__prediction__generic__null-model/` with any static server.
+
+## After a full regeneration
+
+Deep Wiki rewrites most pages. Re-apply these manual corrections before
+committing:
+
+| Check | Where |
+|---|---|
+| Test counts are 27 / 19 / 22 / 15 (83 total) | `01-getting-started/local-development.md` |
+| The 50-week median explanation uses the actual q90 (152,913), not “mean-dominated interval” | `01-getting-started/overview.md` |
+| Direct vs recursive compares the same window (k=34: 13,340 vs 8,866) | `02-architecture/null-forecast.md` |
+| The core signature includes `row_offset` | `README.md`, `MODEL_TEMPLATE.md`, `03-template/build-your-own-model.md` |
+| The adapter is ~540 lines, not ~650 | `03-template/build-your-own-model.md` |
+| The landing page has frontmatter | `index.md` |
+| The public LLM indexes have no `../` links | `python scripts/build_llms.py` |
+
+The script is the reliable way to fix the last item: it rewrites page links to
+absolute site URLs and repository links to GitHub.
 
 ## Publish
 

@@ -52,8 +52,10 @@ Two ideas make the rest of the codebase legible:
 1. **The window is the model.** Everything before `forecast()` exists to turn
    files into two clean `Series`; everything after exists to turn one number into
    a TSV ([`src/run.py:121-145`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/run.py#L121-L145)).
-2. **The card is the contract.** Parameter bounds are not in Python constants
-   first; they are in `fdo.json` and enforced through `jsonschema`
+2. **The card is the contract.** User-facing parameter bounds live in
+   `fdo.json` and are enforced through `jsonschema`; a few structural constants
+   (`MIN_CONTEXT`, `MAX_PREDICTION_STEPS`) are mirrored in the card and checked
+   by the tests
    ([`src/config_schema.py:38-68`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/config_schema.py#L38-L68)).
 
 ## Part II — The four modules
@@ -252,10 +254,10 @@ stateDiagram-v2
 
 | Page | Why read it |
 |---|---|
-| [Execution Pipeline](../02-architecture/execution-pipeline.md) | The detailed trace |
-| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic |
-| [Local Development](../01-getting-started/local-development.md) | Commands |
-| [Staff Engineer Guide](./staff-engineer-guide.md) | When you need the "why" |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | The detailed trace |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | The arithmetic |
+| [Local Development](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/local-development) | Commands |
+| [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide) | When you need the "why" |
 
 ## References
 
@@ -312,7 +314,7 @@ clock. That is what makes the 83-test suite fast and deterministic
 
 | # | Decision | Alternative rejected | Why |
 |---|---|---|---|
-| 1 | Flat direct forecast | Recursive sliding window | Recursion only damps the last difference; worse on the benchmark |
+| 1 | Flat direct forecast | Recursive sliding window | Recursion only damps the last difference; worse at the chosen 34-week window (13,340 vs 8,866) |
 | 2 | Empirical q10/q90 | Parametric normal interval | No distributional assumption; honest for skewed windows |
 | 3 | Clamp point into interval | Report incoherent interval | A point outside its own interval is unusable for scoring |
 | 4 | Card-driven JSON Schema | Python constants + docs | One source of truth for API, CLI and tests |
@@ -414,7 +416,7 @@ the problem is the platform, not the model.
 | First two columns only | Works with any benchmark schema | Cannot use named covariates |
 | Card as schema | One contract, no drift | Card edits need care |
 | No pinned deps | Simple requirements | Reproducibility risk (acknowledged in README) |
-| No recursive mode | Simpler, better on benchmark | Cannot express momentum |
+| No recursive mode | Simpler; better at the chosen window | Cannot express momentum |
 | String → positions | Handles ISO weeks | Output labels are not real dates |
 
 ## When to extend
@@ -444,9 +446,9 @@ repository with its own card, not behind a flag here.
 
 | Page | Why read it |
 |---|---|
-| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic and the clamp |
-| [Model Card and Config Validation](../02-architecture/model-card-and-validation.md) | The contract mechanism |
-| [Executive Guide](./executive-guide.md) | The same tradeoffs without code |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | The arithmetic and the clamp |
+| [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation) | The contract mechanism |
+| [Executive Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/executive-guide) | The same tradeoffs without code |
 
 ## References
 
@@ -583,9 +585,9 @@ savings.
 
 | Page | Why read it |
 |---|---|
-| [Product Manager Guide](./product-manager-guide.md) | The same story for non-engineering stakeholders |
-| [Staff Engineer Guide](./staff-engineer-guide.md) | The technical tradeoffs behind these risks |
-| [Overview](../01-getting-started/overview.md) | The model in plain terms |
+| [Product Manager Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/product-manager-guide) | The same story for non-engineering stakeholders |
+| [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide) | The technical tradeoffs behind these risks |
+| [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview) | The model in plain terms |
 
 ## References
 
@@ -749,9 +751,9 @@ the chosen value should be recorded with the result.
 
 | Page | Why read it |
 |---|---|
-| [Executive Guide](./executive-guide.md) | Cost, risk and investment view |
-| [Overview](../01-getting-started/overview.md) | The model in technical terms |
-| [Configuration](../01-getting-started/configuration.md) | The parameters a user can set |
+| [Executive Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/executive-guide) | Cost, risk and investment view |
+| [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview) | The model in technical terms |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | The parameters a user can set |
 
 ## References
 
@@ -870,10 +872,11 @@ Source: [`src/model.py:27-46`](https://github.com/The-EPISERVE-Consortium/model_
 [`fdo.json:56-61`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L56-L61).
 
 On the AMELAG SARS-CoV-2 benchmark, the choice is dramatic: a 34-week `mean`
-gives MAE 8,866 and full interval coverage, while a 50-week `median` gives the
-same MAE but an interval score 4× worse, because the median level (15,641) sits
-far below the mean-dominated interval. The statistic and the window length are
-therefore tuned together, not independently.
+gives MAE 8,866 and full interval coverage, while a 50-week `median` gives a
+similar MAE (8,559) but an interval score four times worse (151,292 vs 37,756).
+The point forecast is not the problem: the 50-week window contains an older
+spike that pushes q90 to 152,913, so the interval is enormous. The statistic and
+the window length are therefore tuned together, not independently.
 
 ## Non-goals
 
@@ -881,7 +884,7 @@ therefore tuned together, not independently.
 - Not a seasonal-naive or drift model — both would add trend/seasonality
   assumptions that the null hypothesis explicitly rejects.
 - Not a recursive one-step-ahead forecaster (see
-  [The Null Forecast](./../02-architecture/null-forecast.md)).
+  [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast)).
 - Not a data-quality gate: it fills short gaps and rejects long ones, but it
   does not validate semantics ([`src/series.py:221-257`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/series.py#L221-L257)).
 
@@ -889,10 +892,10 @@ therefore tuned together, not independently.
 
 | Page | Why read it |
 |---|---|
-| [Container Contract](./container-contract.md) | The exact `/work` files and exit codes |
-| [Configuration](./configuration.md) | How `history_length` and `statistic` change the level |
-| [The Null Forecast](../02-architecture/null-forecast.md) | The arithmetic behind the flat line |
-| [Execution Pipeline](../02-architecture/execution-pipeline.md) | How a run moves from config to TSV |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | The exact `/work` files and exit codes |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | How `history_length` and `statistic` change the level |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | The arithmetic behind the flat line |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | How a run moves from config to TSV |
 
 ## References
 
@@ -959,7 +962,7 @@ A flat JSON object. Unknown keys are **errors**, not warnings, because the card
 sets `additionalProperties: false`
 ([`fdo.json:31-35`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L31-L35)).
 The schema, bounds and defaults are documented in
-[Configuration](./configuration.md).
+[Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration).
 
 ### `input.parquet`
 
@@ -1087,9 +1090,9 @@ In the container there is no `./work`, so the fallback is `/work`. Locally,
 
 | Page | Why read it |
 |---|---|
-| [Configuration](./configuration.md) | The keys validated before any data is read |
-| [Local Development](./local-development.md) | Reproducing the contract without Kubernetes |
-| [Execution Pipeline](../02-architecture/execution-pipeline.md) | What happens between the files |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | The keys validated before any data is read |
+| [Local Development](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/local-development) | Reproducing the contract without Kubernetes |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | What happens between the files |
 
 ## References
 
@@ -1264,9 +1267,9 @@ be compared with the held-out truth
 
 | Page | Why read it |
 |---|---|
-| [Container Contract](./container-contract.md) | Where the config file lives |
-| [Model Card and Config Validation](../02-architecture/model-card-and-validation.md) | How the card becomes a validator |
-| [The Null Forecast](../02-architecture/null-forecast.md) | What the statistic does to the output |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | Where the config file lives |
+| [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation) | How the card becomes a validator |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | What the statistic does to the output |
 
 ## References
 
@@ -1336,10 +1339,10 @@ pytest tests/test_run.py::test_predictions_are_written_with_the_expected_values 
 
 | File | What it locks down | Tests |
 |---|---|---|
-| `tests/test_config_schema.py` | Card/model agreement, defaults, error text | 17 |
-| `tests/test_model.py` | Point statistics, quantiles, clamping, axis output | 18 |
+| `tests/test_config_schema.py` | Card/model agreement, defaults, error text | 27 |
+| `tests/test_model.py` | Point statistics, quantiles, clamping, axis output | 19 |
 | `tests/test_series.py` | Axis kinds, uniform step, DST, gap policy | 22 |
-| `tests/test_run.py` | Full CLI: config, data errors, TSV output | 26 |
+| `tests/test_run.py` | Full CLI: config, data errors, TSV output | 15 |
 
 Source: [`tests/`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/tree/main/tests).
 
@@ -1444,9 +1447,9 @@ Source: [`src/run.py:65-119`](https://github.com/The-EPISERVE-Consortium/model__
 
 | Page | Why read it |
 |---|---|
-| [Container Contract](./container-contract.md) | The files this page reproduces locally |
-| [Execution Pipeline](../02-architecture/execution-pipeline.md) | What to read when a test fails |
-| [Contributor Guide](../onboarding/contributor-guide.md) | The full onboarding path |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | The files this page reproduces locally |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | What to read when a test fails |
+| [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide) | The full onboarding path |
 
 ## References
 
@@ -1639,10 +1642,10 @@ classDiagram
 
 | Page | Why read it |
 |---|---|
-| [Container Contract](../01-getting-started/container-contract.md) | The external view of this pipeline |
-| [Time Axis and Target Handling](./series-handling.md) | What happens inside the forecast call |
-| [The Null Forecast](./null-forecast.md) | The arithmetic at the centre |
-| [Model Card and Config Validation](./model-card-and-validation.md) | The first two stages in depth |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | The external view of this pipeline |
+| [Time Axis and Target Handling](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/series-handling) | What happens inside the forecast call |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | The arithmetic at the centre |
+| [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation) | The first two stages in depth |
 
 ## References
 
@@ -1825,9 +1828,9 @@ series, so fabricating it would make the null model dishonest
 
 | Page | Why read it |
 |---|---|
-| [Execution Pipeline](./execution-pipeline.md) | Where these functions are called |
-| [The Null Forecast](./null-forecast.md) | What happens to the prepared array |
-| [Configuration](../01-getting-started/configuration.md) | `history_length` and the window |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | Where these functions are called |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | What happens to the prepared array |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | `history_length` and the window |
 
 ## References
 
@@ -1938,14 +1941,17 @@ would append each forecast to the window and recompute; it is deliberately absen
 
 For `k=2`, a recursive mean would produce
 `f_h = y_n - (y_n - y_{n-1}) / 2^h`: the last difference is halved at every step,
-so the path converges to `y_n` rather than following a trend. On the AMELAG
-benchmark that made the forecast worse, not better (MAE 14,960 vs 8,866 for the
-flat 34-week mean). The flat model is both simpler and, on that window, more
-accurate.
+so the path converges to `y_n` rather than following a trend. On AMELAG, at the
+same 34-week window the recursive mean is clearly worse (MAE 13,340 vs 8,866 for
+the flat mean). With a 2-week window it is marginally better than the flat
+2-week mean (14,960 vs 15,222), but both are far from the 34-week flat result.
+The flat model is simpler and, at the window that matters here, more accurate.
 
 | Variant | h=1 | h=2 | h=3 | Limit | Benchmark MAE |
 |---|---|---|---|---|---|
 | Flat mean k=34 | 14,029 | 14,029 | 14,029 | 14,029 | **8,866** |
+| Recursive mean k=34 | 14,029 | 10,671 | 9,518 | 10,569 | 13,340 |
+| Flat mean k=2 | 3,411 | 3,411 | 3,411 | 3,411 | 15,222 |
 | Recursive mean k=2 | 3,411 | 3,839 | 3,625 | 4,267 | 14,960 |
 
 Source: offline replay of the benchmark input; see the
@@ -1989,9 +1995,9 @@ library, and it should not trust its caller
 
 | Page | Why read it |
 |---|---|
-| [Time Axis and Target Handling](./series-handling.md) | How the window array is prepared |
-| [Configuration](../01-getting-started/configuration.md) | How `statistic` and `history_length` are chosen |
-| [Staff Engineer Guide](../onboarding/staff-engineer-guide.md) | Why the design stops here |
+| [Time Axis and Target Handling](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/series-handling) | How the window array is prepared |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | How `statistic` and `history_length` are chosen |
+| [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide) | Why the design stops here |
 
 ## References
 
@@ -2217,9 +2223,9 @@ parameter names.
 
 | Page | Why read it |
 |---|---|
-| [Configuration](../01-getting-started/configuration.md) | The user-facing view of these keys |
-| [Execution Pipeline](./execution-pipeline.md) | Where validation sits in the run |
-| [Local Development](../01-getting-started/local-development.md) | Running `episerve-validate` |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | The user-facing view of these keys |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | Where validation sits in the run |
+| [Local Development](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/local-development) | Running `episerve-validate` |
 
 ## References
 
@@ -2236,8 +2242,8 @@ parameter names.
 Most of an EPISERVE model is not the model. It is the adapter between the
 platform and a forecasting method: reading `/work`, validating the card,
 slicing the history window, extrapolating the time axis, filling gaps, writing
-the TSV, and passing CI. This repository implements that adapter in about 650
-lines and keeps the actual forecast in one small module
+the TSV, and passing CI. This repository implements that adapter in about 540
+lines and keeps the actual forecast in one small module (116 lines)
 ([`src/model.py:49-116`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L49-L116)).
 
 That split is the template: **keep the adapter, replace the core**. A more
@@ -2295,10 +2301,15 @@ def forecast(
     x_series: pd.Series,      # history x, already sliced
     y_series: pd.Series,      # history target, may contain NaN
     prediction_length: int,   # H
+    row_offset: int = 0,      # absolute row index of the first history row
     **parameters,             # declared in fdo.json
 ) -> pd.DataFrame:
     ...
 ```
+
+`row_offset` is the absolute row index of the first history row. Pass it to
+`future_values` for a string axis, so `x_auto_converted` is absolute in the
+input file rather than relative to the window.
 
 and this output
 ([`src/model.py:103-114`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/src/model.py#L103-L114)):
@@ -2306,7 +2317,7 @@ and this output
 | Column | Required | Meaning |
 |---|---|---|
 | `<x>` (input name) | yes | Future time value |
-| `x_auto_converted` | only string axis | 1-indexed absolute row position |
+| `x_auto_converted` | only string axis | 1-indexed absolute row position (uses `row_offset`) |
 | `<y>` (input name) | yes | Point forecast |
 | `<y>_q10` | yes | Lower quantile |
 | `<y>_q90` | yes | Upper quantile |
@@ -2347,13 +2358,15 @@ Source: [`fdo.json:94-108`](https://github.com/The-EPISERVE-Consortium/model__pr
 ## Swapping in a sophisticated method
 
 A realistic replacement keeps the interface and moves all complexity behind it.
-The example below is a gradient-boosted, recursive one-step model; the point is
-the shape, not the algorithm:
+The example below is pseudocode for a gradient-boosted, recursive one-step model;
+the point is the shape, not the algorithm:
 
 ```python
-def forecast(x_series, y_series, prediction_length, **params):
+def forecast(x_series, y_series, prediction_length, row_offset=0, **params):
     values = prepare_target(y_series)          # reuse series.py
     future, positional = future_values(x_series, prediction_length)
+    if positional:
+        future = [value + row_offset for value in future]
 
     model = load_booster(params["model_path"])  # baked into the image
     history = list(values)
@@ -2503,10 +2516,10 @@ For an agent-oriented, file-by-file brief, see
 
 | Page | Why read it |
 |---|---|
-| [Container Contract](../01-getting-started/container-contract.md) | The exact files and exit codes |
-| [The Null Forecast](../02-architecture/null-forecast.md) | The reference core implementation |
-| [Model Card and Config Validation](../02-architecture/model-card-and-validation.md) | How the card drives validation |
-| [Contributor Guide](../onboarding/contributor-guide.md) | Testing and contribution workflow |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | The exact files and exit codes |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | The reference core implementation |
+| [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation) | How the card drives validation |
+| [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide) | Testing and contribution workflow |
 
 ## References
 
@@ -2593,43 +2606,43 @@ flowchart TD
 
 | Section | What it answers | Start here |
 |---|---|---|
-| Getting Started | What the model is, the container contract, config keys, local dev | [Overview](./01-getting-started/overview.md) |
-| Deep Dive | How the pipeline, axis handling, forecast and validation actually work | [Execution Pipeline](./02-architecture/execution-pipeline.md) |
-| Onboarding | Role-specific paths: contributor, staff engineer, executive, PM | [Contributor Guide](./onboarding/contributor-guide.md) |
-| Building a Model | How to reuse this repository for a new model | [Build Your Own Model](./03-template/build-your-own-model.md) |
+| Getting Started | What the model is, the container contract, config keys, local dev | [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview) |
+| Deep Dive | How the pipeline, axis handling, forecast and validation actually work | [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) |
+| Onboarding | Role-specific paths: contributor, staff engineer, executive, PM | [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide) |
+| Building a Model | How to reuse this repository for a new model | [Build Your Own Model](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/03-template/build-your-own-model) |
 
 ### Getting Started
 
 | Page | Description |
 |---|---|
-| [Overview](./01-getting-started/overview.md) | Purpose, flat forecast, benchmark role |
-| [Container Contract](./01-getting-started/container-contract.md) | `/work` I/O, exit codes, `--check-config` |
-| [Configuration](./01-getting-started/configuration.md) | The four parameters and their bounds |
-| [Local Development](./01-getting-started/local-development.md) | Run, test, build, publish |
+| [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview) | Purpose, flat forecast, benchmark role |
+| [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) | `/work` I/O, exit codes, `--check-config` |
+| [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration) | The four parameters and their bounds |
+| [Local Development](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/local-development) | Run, test, build, publish |
 
 ### Deep Dive
 
 | Page | Description |
 |---|---|
-| [Execution Pipeline](./02-architecture/execution-pipeline.md) | `main()` step by step, including failures |
-| [Time Axis and Target Handling](./02-architecture/series-handling.md) | Datetime/numeric/string axes, gap policy |
-| [The Null Forecast](./02-architecture/null-forecast.md) | Point statistic, quantiles, clamping |
-| [Model Card and Config Validation](./02-architecture/model-card-and-validation.md) | Card-driven JSON Schema validation |
+| [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) | `main()` step by step, including failures |
+| [Time Axis and Target Handling](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/series-handling) | Datetime/numeric/string axes, gap policy |
+| [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) | Point statistic, quantiles, clamping |
+| [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation) | Card-driven JSON Schema validation |
 
 ### Building a Model
 
 | Page | Description |
 |---|---|
-| [Build Your Own Model](./03-template/build-your-own-model.md) | Reuse this repo: keep the adapter, replace the core method |
+| [Build Your Own Model](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/03-template/build-your-own-model) | Reuse this repo: keep the adapter, replace the core method |
 
 ### Onboarding
 
 | Guide | Audience |
 |---|---|
-| [Contributor Guide](./onboarding/contributor-guide.md) | New contributors |
-| [Staff Engineer Guide](./onboarding/staff-engineer-guide.md) | Staff/principal engineers |
-| [Executive Guide](./onboarding/executive-guide.md) | Engineering leaders |
-| [Product Manager Guide](./onboarding/product-manager-guide.md) | PMs and stakeholders |
+| [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide) | New contributors |
+| [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide) | Staff/principal engineers |
+| [Executive Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/executive-guide) | Engineering leaders |
+| [Product Manager Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/product-manager-guide) | PMs and stakeholders |
 
 ## Key files
 
@@ -2656,8 +2669,9 @@ flowchart TD
 
 ## Reading paths
 
-- **First contact** → [Overview](./01-getting-started/overview.md) → [Container Contract](./01-getting-started/container-contract.md) → [Configuration](./01-getting-started/configuration.md)
-- **Changing the code** → [Execution Pipeline](./02-architecture/execution-pipeline.md) → [The Null Forecast](./02-architecture/null-forecast.md) → [Contributor Guide](./onboarding/contributor-guide.md)
-- **Reviewing the design** → [Staff Engineer Guide](./onboarding/staff-engineer-guide.md) → [Model Card and Config Validation](./02-architecture/model-card-and-validation.md)
-- **Non-engineering** → [Product Manager Guide](./onboarding/product-manager-guide.md) → [Executive Guide](./onboarding/executive-guide.md)
+- **First contact** → [Overview](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/overview) → [Container Contract](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/container-contract) → [Configuration](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/01-getting-started/configuration)
+- **Changing the code** → [Execution Pipeline](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/execution-pipeline) → [The Null Forecast](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/null-forecast) → [Contributor Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/contributor-guide)
+- **Reusing this as a template** → [Build Your Own Model](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/03-template/build-your-own-model) → [`MODEL_TEMPLATE.md`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/MODEL_TEMPLATE.md)
+- **Reviewing the design** → [Staff Engineer Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/staff-engineer-guide) → [Model Card and Config Validation](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/02-architecture/model-card-and-validation)
+- **Non-engineering** → [Product Manager Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/product-manager-guide) → [Executive Guide](https://the-episerve-consortium.github.io/model__prediction__generic__null-model/onboarding/executive-guide)
 </doc>

@@ -117,9 +117,9 @@
   },
 
   "episerve:documentation": {
-    "method": "Repeats a statistic of the history window (mean, median or last value) over the forecast horizon. The 10th and 90th percentiles are the empirical quantiles of the same window, clamped so that the point forecast lies inside the interval; a constant window gives q10 = q90 = point.",
+    "method": "Repeats a statistic of the history window (mean, median or last value) over the forecast horizon. The forecast is flat: the same point and interval are written for every step. It is a direct multi-step forecast; predictions are never fed back into the window. The 10th and 90th percentiles are the empirical quantiles of the same window, clamped so that the point forecast lies inside the interval; a constant window gives q10 = q90 = point.",
     "intendedUse": "Performance floor on benchmarks and a fast end-to-end check of the model-runner pipeline.",
-    "limitations": "No trend, seasonality or covariates, and one series per run. The interval reflects the spread of the history window, not forecast uncertainty. A string time axis is continued as row positions rather than labels.",
+    "limitations": "The forecast is constant over the horizon (direct multi-step, not recursive). No trend, seasonality or covariates, and one series per run. The interval reflects the spread of the history window, not forecast uncertainty. A string time axis is continued as row positions rather than labels.",
     "trainingData": "Not trained; the model has no parameters and downloads no weights.",
     "references": [
       "https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model"

@@ -25,8 +25,8 @@ Keep that boundary; it is what makes the model testable and portable.
 - **Container contract:** read `/work/input/config.json` and
   `/work/input/input.parquet`; write `/work/output/predictions.tsv`; exit 0 on
   success, 1 with `ERROR: <message>` on failure.
-- **Pure core:** `src/model.py::forecast(...)` performs no file I/O, no network,
-  no environment reads and no global mutation.
+- **Pure core:** `src/model.py::forecast(x, y, prediction_length, row_offset=0, **params)`
+  performs no file I/O, no network, no environment reads and no global mutation.
 - **Output schema:** one row per forecast step, the x column, the target point,
   `<target>_q10`, `<target>_q90`; `x_auto_converted` only for a string axis.
 - **Card is the contract:** `fdo.json` declares parameters, inputs, outputs,
@@ -85,9 +85,13 @@ Keep that boundary; it is what makes the model testable and portable.
 
 ## Core method guidance
 
-- **Inputs:** you receive the history window as two `pandas.Series` (x and y)
-  already sliced and gap-filled. Do not re-read the parquet file.
+- **Inputs:** you receive the history window as two `pandas.Series` (x and y),
+  already sliced but **not** gap-filled. Call `series.prepare_target(y)` (as the
+  reference core does) before using it. Do not re-read the parquet file.
 - **Output:** build a `DataFrame` with the same column names as the input target.
+- **`row_offset`:** the absolute row index of the first history row. Pass it to
+  `future_values` so a string axis reports absolute positions in
+  `x_auto_converted`.
 - **Quantiles:** emit real predictive quantiles if the method supports them; if
   not, derive them from a residual/backtest distribution, not from an arbitrary
   constant width.

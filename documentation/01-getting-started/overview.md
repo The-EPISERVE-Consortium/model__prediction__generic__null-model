@@ -113,10 +113,11 @@ Source: [`src/model.py:27-46`](https://github.com/The-EPISERVE-Consortium/model_
 [`fdo.json:56-61`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/fdo.json#L56-L61).
 
 On the AMELAG SARS-CoV-2 benchmark, the choice is dramatic: a 34-week `mean`
-gives MAE 8,866 and full interval coverage, while a 50-week `median` gives the
-same MAE but an interval score 4× worse, because the median level (15,641) sits
-far below the mean-dominated interval. The statistic and the window length are
-therefore tuned together, not independently.
+gives MAE 8,866 and full interval coverage, while a 50-week `median` gives a
+similar MAE (8,559) but an interval score four times worse (151,292 vs 37,756).
+The point forecast is not the problem: the 50-week window contains an older
+spike that pushes q90 to 152,913, so the interval is enormous. The statistic and
+the window length are therefore tuned together, not independently.
 
 ## Non-goals
 
