@@ -143,6 +143,12 @@ Two design choices stand out:
    That catches missing runtime dependencies that a host `pip install` would
    hide.
 
+Images built by CI carry the source Git commit SHA in the OCI label
+`org.opencontainers.image.revision`, including the tested image and both
+published tag variants
+([`.github/workflows/publish.yml:60`](https://github.com/The-EPISERVE-Consortium/model__prediction__generic__null-model/blob/main/.github/workflows/publish.yml#L60)).
+The null model has no weights to pin.
+
 ## Release checklist
 
 | Step | Command | Result |

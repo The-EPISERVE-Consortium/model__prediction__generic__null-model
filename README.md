@@ -150,6 +150,9 @@ docker run --rm -v $(pwd)/work/input:/work/input -v $(pwd)/work/output:/work/out
 
 ## Release
 
+Images built by CI include the source Git commit SHA in the OCI label
+`org.opencontainers.image.revision`.
+
 Push to `main` → CI builds the image, runs lint, type checks and tests inside
 it, and pushes `:latest` to GHCR. `git tag v0.1.0 && git push origin v0.1.0`
 also publishes the pinned `:v0.1.0` image. `:latest` follows `main` on
