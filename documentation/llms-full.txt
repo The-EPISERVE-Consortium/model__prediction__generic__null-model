@@ -2193,7 +2193,7 @@ all four keys, with `prediction_offset=0` and `statistic="mean"`
 ```mermaid
 flowchart TD
     P["push / PR"] --> C["job: model-card"]
-    C --> A["The-EPISERVE-Consortium/episerve_specs@v0.5.0"]
+    C --> A["The-EPISERVE-Consortium/episerve_specs@v0.7.0"]
     A --> R{"valid?"}
     R -- yes --> OK["green check"]
     R -- no --> ERR["red check, image still builds"]
@@ -2210,7 +2210,7 @@ but does not block a code fix from shipping
 Locally:
 
 ```bash
-pip install "git+https://github.com/The-EPISERVE-Consortium/episerve_specs@v0.5.0"
+pip install "git+https://github.com/The-EPISERVE-Consortium/episerve_specs@v0.7.0"
 episerve-validate fdo.json
 ```
 
