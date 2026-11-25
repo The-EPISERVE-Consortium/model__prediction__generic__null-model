@@ -120,7 +120,7 @@ It declares the parameters, the input and output columns, the resources
 (`network: false`) and the documentation. CI validates it; locally:
 
 ```bash
-pip install "git+https://github.com/The-EPISERVE-Consortium/episerve_specs@v0.4.0"
+pip install "git+https://github.com/The-EPISERVE-Consortium/episerve_specs@v0.5.0"
 episerve-validate fdo.json
 ```
 
